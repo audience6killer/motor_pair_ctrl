@@ -1,17 +1,15 @@
 #ifndef TRACTION_CONTROL_H
 #define TRACTION_CONTROL_H
 
-typedef enum
-{
-    BREAK, // Stop motor in a break way (Slow decay)
-    COAST, // Stop motor in a coast way (aka Fast Decay)
-    FORWARD,
-    REVERSE,
-    TURN_LEFT_FORWARD, // All turns are on its axis
-    TURN_RIGHT_FORWARD,
-    TURN_LEFT_REVERSE,
-    TURN_RIGHT_REVERSE,
-} traction_state_e;
+#include "motor_pair_ctrl.h"
+
+/**
+ * @brief Set traction direction
+ * 
+ * @param state 
+ * @return esp_err_t 
+ */
+esp_err_t traction_set_direction(motor_pair_state_e *state);
 
 /**
  * @brief 

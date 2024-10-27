@@ -125,12 +125,7 @@ esp_err_t motor_pair_init_individual_motor(motor_config_t *motor_config,
     return ESP_OK;
 }
 
-/**
- * @brief Set motors desiered speed. Speed can be positive or negative.
- * @param motor_left_speed Speed must be in pulses
- * @param motor_right_speed 
- * @return esp_err_t 
- */
+
 esp_err_t motor_pair_set_speed(int *motor_left_speed, int *motor_right_speed, motor_pair_handle_t *motor_pair)
 {
     if (motor_left_speed == NULL || motor_right_speed == NULL)

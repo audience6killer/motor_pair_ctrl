@@ -41,10 +41,6 @@
 #define TRACTION_MOTOR_RIGHT_KI         0.4
 #define TRACTION_MOTOR_RIGHT_KD         0.2
 
-#define MOTOR_LEFT_DESIRED_SPEED        5
-#define MOTOR_RIGHT_DESIRED_SPEED       10
-#define TRACTION_DESIRED_SPEED          10
-
 #define MOTOR_LEFT_MAX_SPEED            50
 #define MOTOR_RIGHT_MAX_SPEED           38
 

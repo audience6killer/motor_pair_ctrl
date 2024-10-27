@@ -19,14 +19,14 @@ static const char TAG[] = "traction_control";
 
 static motor_pair_handle_t *traction_handle = NULL;
 static QueueHandle_t traction_queue_handle;
-static traction_state_e g_traction_state = BREAK;
+static motor_pair_state_e g_traction_state = BREAK;
 
 
 static void traction_pid_loop_cb(void *args)
 {
     static int motor_left_last_pulse_count = 0;
     static int motor_right_last_pulse_count = 0;
-    static traction_state_e last_traction_state = BREAK;
+    static motor_pair_state_e last_traction_state = BREAK;
 
     // Where will be saved the current info for the motor pair
     motor_pair_data_t *pair_data = (motor_pair_data_t*)args;
@@ -128,6 +128,14 @@ static void traction_pid_loop_cb(void *args)
     pair_data->motor_right_real_pulses = motor_right_real_pulses;
     pair_data->motor_left_desired_speed = traction_handle->motor_left_ctx.desired_speed;
     pair_data->motor_right_desired_speed = traction_handle->motor_right_ctx.desired_speed;
+}
+
+esp_err_t traction_set_direction(motor_pair_state_e *state)
+{
+    // TODO: Some kind of verification might be necessary
+    g_traction_state = *state;
+
+    return ESP_OK;
 }
 
 /**

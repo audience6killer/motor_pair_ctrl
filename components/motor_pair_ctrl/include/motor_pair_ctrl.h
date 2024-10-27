@@ -70,7 +70,24 @@ typedef struct
     char id[20];
 } motor_pair_handle_t;
 
+typedef enum
+{
+    BREAK, // Stop motor in a break way (Slow decay)
+    COAST, // Stop motor in a coast way (aka Fast Decay)
+    FORWARD,
+    REVERSE,
+    TURN_LEFT_FORWARD, // All turns are on its axis
+    TURN_RIGHT_FORWARD,
+    TURN_LEFT_REVERSE,
+    TURN_RIGHT_REVERSE,
+} motor_pair_state_e;
 
+/**
+ * @brief Set motors desiered speed. Speed can be positive or negative.
+ * @param motor_left_speed Speed must be in pulses
+ * @param motor_right_speed 
+ * @return esp_err_t 
+ */
 esp_err_t motor_pair_set_speed(int *motor_left_speed, int *motor_right_speed, motor_pair_handle_t *motor_pair);
 
 
