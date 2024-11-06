@@ -1,6 +1,4 @@
 #include <stdio.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 
 #include "traction_control.h"
 #include "seed_planter_control.h"

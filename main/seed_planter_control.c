@@ -21,6 +21,8 @@ static motor_pair_state_e g_cutter_disc_state = BREAK;
 
 static motor_pair_state_e g_seed_dispenser_state = BREAK;
 
+
+
 static void seed_planter_pid_loop_cb(void *args)
 {
     static int cutter_disc_last_pulse_count = 0;

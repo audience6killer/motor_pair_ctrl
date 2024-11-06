@@ -2,6 +2,7 @@
 #define MOTOR_PAIR_CTRL_H
 
 #include <stdint.h>
+#include "queue.h"
 #include "driver/pulse_cnt.h"
 #include "bdc_motor.h"
 #include "pid_ctrl.h"
@@ -60,6 +61,7 @@ typedef struct
     pid_ctrl_block_handle_t pid_ctrl;
     char motor_id[20];
     int report_pulses;
+    queue_t speed_queue;
     int desired_speed; // In pulses
 } motor_control_context_t;
 
@@ -81,6 +83,24 @@ typedef enum
     TURN_LEFT_REVERSE,
     TURN_RIGHT_REVERSE,
 } motor_pair_state_e;
+
+/**
+ * @brief Calculate bezier curve points for smooth start. The start value will always be 0 
+ * 
+ * @param no_points Each point will be applied each pid period 
+ * @param final_value PWM value
+ * @param pvPoints 
+ * @return esp_err_t 
+ */
+// esp_err_t calculate_lspb_speed_curve(const uint32_t *no_points, uint32_t *final_value, uint32_t *pvPoints);
+
+
+/**
+ * @brief 
+ * 
+ * @return esp_err_t 
+ */
+esp_err_t motor_pair_smooth_start(void);
 
 /**
  * @brief Set motors desiered speed. Speed can be positive or negative.

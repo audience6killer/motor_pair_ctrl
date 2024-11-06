@@ -17,6 +17,7 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "math.h"
 
 #include "motor_pair_ctrl.h"
 
@@ -26,9 +27,53 @@
 
 static const char TAG[] = "motor_pair";
 
-esp_err_t motor_pair_init_individual_motor(motor_config_t *motor_config,
-                                           motor_pair_bdc_config_t *pair_config,
-                                           motor_control_context_t *pvMotor)
+esp_err_t calculate_lspb_speed_curve(const uint32_t *no_points, const float *f_speed, uint32_t *pvPoints)
+{
+    const uint32_t tf = *no_points;
+    const float qf = *f_speed;
+
+    // Allocate point array
+    pvPoints = (uint32_t *)malloc((tf) * sizeof(uint32_t));
+
+    const float V = 3.2f;
+    const float q0 = 0.0f;
+    const uint32_t t0 = 0;
+    const uint32_t tb = (q0 - qf + V * tf) / (V);
+
+    float point = 0.0f;
+
+    for (int t = 0; t <= tf; t++)
+    {
+        if (t >= t0 && t < tb)
+        {
+            point = q0 + V / (2 * tb) * pow(t, 2);
+        }
+        else if (t >= tb && t < tf - tb)
+        {
+            point = (qf + q0 - V * tf) / 2 + V * t;
+        }
+        else if (t >= tf - tb)
+        {
+            point = qf - (V * pow(tf, 2)) / (2 * tb) + (V * tf) / tb * t - V / (2 * tb) * pow(t, 2);
+        }
+        else
+        {
+            ESP_LOGE(TAG, "lspb curve time value out of bounds!");
+            return ESP_FAIL;
+        }
+
+        pvPoints[t] = (uint32_t)floor(point);
+    }
+
+    return ESP_OK;
+}
+
+//esp_err_t motor_pair_smooth_start(void)
+//{
+//    
+//}
+
+esp_err_t motor_pair_init_individual_motor(motor_config_t *motor_config , motor_pair_bdc_config_t *pair_config, motor_control_context_t *pvMotor)
 {
     ESP_LOGI(TAG, "Initializing motor");
 
@@ -124,7 +169,6 @@ esp_err_t motor_pair_init_individual_motor(motor_config_t *motor_config,
 
     return ESP_OK;
 }
-
 
 esp_err_t motor_pair_set_speed(int *motor_left_speed, int *motor_right_speed, motor_pair_handle_t *motor_pair)
 {
