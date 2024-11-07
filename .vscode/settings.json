@@ -10,12 +10,13 @@
     "idf.openOcdConfigs": [
         "board/esp32-wrover-kit-3.3v.cfg"
     ],
-    "idf.port": "/dev/ttyS0",
+    "idf.port": "/dev/ttyUSB0",
     "idf.pythonBinPath": "/home/vill4in/.espressif/python_env/idf5.0_py3.10_env/bin/python",
     "idf.toolsPath": "/home/vill4in/.espressif",
     "editor.wordWrap": "on",
     "files.associations": {
         "*.ejs": "html",
         "traction_control.h": "c"
-    }
+    },
+    "idf.flashType": "UART"
 }

@@ -18,6 +18,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "math.h"
+#include "string.h"
 
 #include "motor_pair_ctrl.h"
 
@@ -27,22 +28,22 @@
 
 static const char TAG[] = "motor_pair";
 
-esp_err_t calculate_lspb_speed_curve(const uint32_t *no_points, const float *f_speed, uint32_t *pvPoints)
+esp_err_t calculate_lspb_speed_curve(const uint32_t tf, float qf, float *pvPoints)
 {
-    const uint32_t tf = *no_points;
-    const float qf = *f_speed;
+    //const uint32_t tf = (*no_points);
+    // const float qf = (*f_speed);
 
     // Allocate point array
-    pvPoints = (uint32_t *)malloc((tf) * sizeof(uint32_t));
+    // pvPoints = (float *)malloc((tf) * sizeof(float));
 
-    const float V = 3.2f;
+    const float V = 0.025f;
     const float q0 = 0.0f;
-    const uint32_t t0 = 0;
-    const uint32_t tb = (q0 - qf + V * tf) / (V);
+    const float t0 = 0.0f;
+    const float tb = (q0 - qf + V * tf) / (V);
 
     float point = 0.0f;
 
-    for (int t = 0; t <= tf; t++)
+    for (int t = 0; t < tf; t++)
     {
         if (t >= t0 && t < tb)
         {
@@ -62,20 +63,39 @@ esp_err_t calculate_lspb_speed_curve(const uint32_t *no_points, const float *f_s
             return ESP_FAIL;
         }
 
-        pvPoints[t] = (uint32_t)floor(point);
+        pvPoints[t] = point;
     }
 
     return ESP_OK;
 }
 
-//esp_err_t motor_pair_smooth_start(void)
-//{
-//    
-//}
-
-esp_err_t motor_pair_init_individual_motor(motor_config_t *motor_config , motor_pair_bdc_config_t *pair_config, motor_control_context_t *pvMotor)
+esp_err_t motor_pair_smooth_start(motor_pair_handle_t *pvMotor, float target_speed)
 {
-    ESP_LOGI(TAG, "Initializing motor");
+    // Target speed: 1.688f
+    const int no_points = 100;
+    float speed_points[no_points]; 
+    calculate_lspb_speed_curve(no_points, target_speed, speed_points);
+
+    if(queue_size(pvMotor->motor_left_ctx.speed_queue) != 0)
+        empty_queue(pvMotor->motor_left_ctx.speed_queue);
+    if(queue_size(pvMotor->motor_right_ctx.speed_queue) != 0)
+        empty_queue(pvMotor->motor_right_ctx.speed_queue);    
+
+    for (size_t i = 0; i < no_points; i++)
+    {
+        if (enqueue(pvMotor->motor_left_ctx.speed_queue, speed_points[i]) == -1 || enqueue(pvMotor->motor_right_ctx.speed_queue, speed_points[i]) == -1)
+        {
+            return ESP_FAIL;
+        }
+    }
+
+    return ESP_OK;
+}
+
+esp_err_t motor_pair_init_individual_motor(motor_config_t *motor_config, motor_pair_bdc_config_t *pair_config, motor_control_context_t *pvMotor)
+{
+    strcpy(pvMotor->motor_id, motor_config->motor_id);
+    ESP_LOGI(TAG, "Initializing motor: %s", pvMotor->motor_id);
 
     pvMotor->pcnt_encoder = NULL;
     bdc_motor_config_t bdc_motor_config = {
@@ -92,6 +112,8 @@ esp_err_t motor_pair_init_individual_motor(motor_config_t *motor_config , motor_
 
     ESP_ERROR_CHECK(bdc_motor_new_mcpwm_device(&bdc_motor_config, &mcpwm_config, &bdc_motor));
 
+    pvMotor->motor = bdc_motor;
+
     // Setting up motor encoders
     pcnt_unit_config_t motor_pcnt_config = {
         .high_limit = pair_config->bdc_encoder_pcnt_high_limit,
@@ -104,7 +126,7 @@ esp_err_t motor_pair_init_individual_motor(motor_config_t *motor_config , motor_
     ESP_ERROR_CHECK(pcnt_new_unit(&motor_pcnt_config, &motor_pcnt_unit));
 
     pcnt_glitch_filter_config_t pcnt_filter_config = {
-        .max_glitch_ns = 1000,
+        .max_glitch_ns = 100,
     };
 
     ESP_ERROR_CHECK(pcnt_unit_set_glitch_filter(motor_pcnt_unit, &pcnt_filter_config));
@@ -140,7 +162,7 @@ esp_err_t motor_pair_init_individual_motor(motor_config_t *motor_config , motor_
         .ki = motor_config->pid_config.ki,
         .kd = motor_config->pid_config.kd,
         .cal_type = PID_CAL_TYPE_INCREMENTAL,
-        .max_output = pair_config->bdc_mcpwm_timer_resolution_hz / motor_config->pwm_freq_hz,
+        .max_output = pair_config->bdc_mcpwm_timer_resolution_hz / pair_config->pwm_freq_hz,
         .min_output = 0,
         .max_integral = 1000,
         .min_integral = -1000,
@@ -155,43 +177,50 @@ esp_err_t motor_pair_init_individual_motor(motor_config_t *motor_config , motor_
 
     pvMotor->pid_ctrl = motor_pid_ctrl;
 
-    ESP_LOGI(TAG, "Starting encoder unit: %s", motor_config->motor_id);
+    // Motor queue setup
+    int speed_queue_size = 100; // For the smooth start
+    pvMotor->speed_queue = create_queue(speed_queue_size);
 
-    ESP_ERROR_CHECK(pcnt_unit_enable(pvMotor->pcnt_encoder));
+    // Starting system
+    // ESP_LOGI(TAG, "Starting encoder unit: %s", pvMotor->motor_id);
 
-    ESP_ERROR_CHECK(pcnt_unit_clear_count(pvMotor->pcnt_encoder));
+    // ESP_ERROR_CHECK(pcnt_unit_enable(pvMotor->pcnt_encoder));
 
-    ESP_ERROR_CHECK(pcnt_unit_start(pvMotor->pcnt_encoder));
+    // ESP_ERROR_CHECK(pcnt_unit_clear_count(pvMotor->pcnt_encoder));
 
-    ESP_LOGI(TAG, "Enabling motor: %s", motor_config->motor_id);
-    ESP_ERROR_CHECK(bdc_motor_enable(pvMotor->motor));
-    ESP_ERROR_CHECK(bdc_motor_brake(pvMotor->motor));
+    // ESP_ERROR_CHECK(pcnt_unit_start(pvMotor->pcnt_encoder));
+
+    // ESP_LOGI(TAG, "Enabling motor: %s", motor_config->motor_id);
+    // ESP_ERROR_CHECK(bdc_motor_enable(pvMotor->motor));
+    // ESP_ERROR_CHECK(bdc_motor_brake(pvMotor->motor));
 
     return ESP_OK;
 }
 
-esp_err_t motor_pair_set_speed(int *motor_left_speed, int *motor_right_speed, motor_pair_handle_t *motor_pair)
+esp_err_t motor_pair_set_speed(int motor_left_speed, int motor_right_speed, motor_pair_handle_t *motor_pair)
 {
-    if (motor_left_speed == NULL || motor_right_speed == NULL)
+    /*if (motor_left_speed == NULL || motor_right_speed == NULL)
     {
         ESP_LOGE(TAG, "Speed provided for the motors is NULL");
         return ESP_FAIL;
-    }
+    }*/
 
-    motor_pair->motor_left_ctx.desired_speed = *motor_left_speed;
-    motor_pair->motor_right_ctx.desired_speed = *motor_right_speed;
+    if (enqueue(motor_pair->motor_left_ctx.speed_queue, motor_left_speed) == -1)
+    {
+        ESP_LOGE(TAG, "Cannot enqueue value to %s queue", motor_pair->motor_left_ctx.motor_id);
+        return ESP_FAIL;
+    }
+    if (enqueue(motor_pair->motor_right_ctx.speed_queue, motor_right_speed) == -1)
+    {
+        ESP_LOGE(TAG, "Cannot enqueue value to %s queue", motor_pair->motor_right_ctx.motor_id);
+        return ESP_FAIL;
+    }
+    // motor_pair->motor_left_ctx.desired_speed = *motor_left_speed;
+    // motor_pair->motor_right_ctx.desired_speed = *motor_right_speed;
 
     return ESP_OK;
 }
 
-/**
- * @brief Motor pair initialization
- *
- * @param config
- * @param pid_config
- * @param pvHandle
- * @return esp_err_t
- */
 esp_err_t motor_pair_init(motor_pair_config_t *config,
                           motor_pair_handle_t *pvHandle)
 {
@@ -199,11 +228,32 @@ esp_err_t motor_pair_init(motor_pair_config_t *config,
 
     // TODO: SPLIT individual initialization into a new function starting here
 
-    motor_control_context_t *motor_left = &pvHandle->motor_left_ctx;
-    motor_control_context_t *motor_right = &pvHandle->motor_right_ctx;
+    // motor_control_context_t *motor_left = &pvHandle->motor_left_ctx;
+    // motor_control_context_t *motor_right = &pvHandle->motor_right_ctx;
 
-    motor_pair_init_individual_motor(&config->motor_left_config, &config->bdc_config, motor_left);
-    motor_pair_init_individual_motor(&config->motor_right_config, &config->bdc_config, motor_right);
+    ESP_ERROR_CHECK ( motor_pair_init_individual_motor(&config->motor_left_config, &config->bdc_config, &pvHandle->motor_left_ctx) );
+    ESP_ERROR_CHECK( motor_pair_init_individual_motor(&config->motor_right_config, &config->bdc_config, &pvHandle->motor_right_ctx) );
 
+    // Enable both motors
+    ESP_LOGI(TAG, "Starting encoder unit: %s", pvHandle->motor_left_ctx.motor_id);
+    ESP_ERROR_CHECK(pcnt_unit_enable(pvHandle->motor_left_ctx.pcnt_encoder));
+    ESP_LOGI(TAG, "Starting encoder unit: %s", pvHandle->motor_right_ctx.motor_id);
+    ESP_ERROR_CHECK(pcnt_unit_enable(pvHandle->motor_right_ctx.pcnt_encoder));
+
+    ESP_ERROR_CHECK(pcnt_unit_clear_count(pvHandle->motor_left_ctx.pcnt_encoder));
+    ESP_ERROR_CHECK(pcnt_unit_clear_count(pvHandle->motor_right_ctx.pcnt_encoder));
+
+    ESP_ERROR_CHECK(pcnt_unit_start(pvHandle->motor_left_ctx.pcnt_encoder));
+    ESP_ERROR_CHECK(pcnt_unit_start(pvHandle->motor_right_ctx.pcnt_encoder));
+
+    // ESP_LOGI(TAG, "Enabling motor: %s", pvHandle->motor_left_ctx.motor_id);
+    // ESP_ERROR_CHECK(bdc_motor_enable(pvHandle->motor_left_ctx.motor));
+
+    // ESP_LOGI(TAG, "Enabling motor: %s", pvHandle->motor_right_ctx.motor_id);
+    // ESP_ERROR_CHECK(bdc_motor_enable(pvHandle->motor_right_ctx.motor));
+
+    // ESP_ERROR_CHECK(bdc_motor_brake(pvHandle->motor_left_ctx.motor));
+    // ESP_ERROR_CHECK(bdc_motor_brake(pvHandle->motor_right_ctx.motor));
+    
     return ESP_OK;
 }

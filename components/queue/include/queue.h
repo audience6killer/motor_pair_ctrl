@@ -9,13 +9,17 @@ typedef struct
     int *data;
 } queue_t;
 
-int is_empty(queue_t* queue);
+// TODO: Empty queue
 
-int is_full(queue_t* queue);
+int empty_queue(queue_t* queue);
+
+int is_queue_empty(queue_t* queue);
+
+int is_queue_full(queue_t* queue);
 
 int queue_size(queue_t* queue);
 
-void enqueue(queue_t *queue, int data); 
+int enqueue(queue_t *queue, int data); 
 
 int dequeue(queue_t *queue);
 

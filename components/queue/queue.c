@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include "stdio.h"
 #include "queue.h"
 
 queue_t* create_queue(int capacity) {
@@ -23,26 +24,50 @@ queue_t* create_queue(int capacity) {
     return queue;
 }
 
-int is_empty(queue_t *queue) {
+int empty_queue(queue_t* queue)
+{
+    if(queue != NULL)
+    {
+        for (size_t i = 0; i < queue->size; i++)
+        {
+            dequeue(queue);
+        }
+        return 1;
+    }
+    else
+    {
+        return -1;
+    }
+}
+
+int is_queue_empty(queue_t *queue) {
     return queue->size == 0;
 }
 
-int is_full(queue_t *queue) {
+int is_queue_full(queue_t *queue) {
     return queue->size == queue->capacity;
 }
 
-void enqueue(queue_t *queue, int data) {
-    if (is_full(queue)) {
-        return;
+int queue_size(queue_t *queue)
+{
+    return queue->size;
+}
+
+int enqueue(queue_t *queue, int data) {
+    if (is_queue_full(queue)) {
+        return -1;
     }
 
+    printf("Added value to queue: %d\n", data);
     queue->data[queue->tail] = data;
     queue->tail = (queue->tail + 1) % queue->capacity;
     queue->size++;
+
+    return 1;
 }
 
 int dequeue(queue_t *queue) {
-    if (is_empty(queue)) {
+    if (is_queue_empty(queue)) {
         return -1;
     }
 
@@ -54,10 +79,19 @@ int dequeue(queue_t *queue) {
 }
 
 int front(queue_t *queue) {
-    if (is_empty(queue)) {
+    if (is_queue_empty(queue)) {
         return -1;
     } else {
         return queue->data[queue->head];
+    }
+}
+
+int back(queue_t *queue)
+{
+    if (is_queue_empty(queue)) {
+        return -1;
+    } else {
+        return queue->data[queue->tail];
     }
 }
 

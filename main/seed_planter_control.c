@@ -17,9 +17,9 @@ static motor_pair_handle_t *seed_planter_handle = NULL;
 
 static QueueHandle_t seed_planter_queue_handle;
 
-static motor_pair_state_e g_cutter_disc_state = BREAK;
+static motor_pair_state_e g_cutter_disc_state = BRAKE;
 
-static motor_pair_state_e g_seed_dispenser_state = BREAK;
+static motor_pair_state_e g_seed_dispenser_state = BRAKE;
 
 
 
@@ -27,8 +27,8 @@ static void seed_planter_pid_loop_cb(void *args)
 {
     static int cutter_disc_last_pulse_count = 0;
     static int seed_dispenser_last_pulse_count = 0;
-    static motor_pair_state_e last_cutter_disc_state = BREAK;
-    static motor_pair_state_e last_seed_dispenser_state = BREAK;
+    static motor_pair_state_e last_cutter_disc_state = BRAKE;
+    static motor_pair_state_e last_seed_dispenser_state = BRAKE;
 
     // Where will be saved the current info for the motor pair
     motor_pair_data_t *pair_data = (motor_pair_data_t *)args;
@@ -59,7 +59,7 @@ static void seed_planter_pid_loop_cb(void *args)
 
         switch (g_cutter_disc_state)
         {
-        case BREAK:
+        case BRAKE:
             ESP_ERROR_CHECK(bdc_motor_brake(cutter_disc->motor));
             ESP_LOGI(TAG, "Cutter disc break");
             break;
@@ -88,7 +88,7 @@ static void seed_planter_pid_loop_cb(void *args)
 
         switch (g_seed_dispenser_state)
         {
-        case BREAK:
+        case BRAKE:
             ESP_ERROR_CHECK(bdc_motor_brake(seed_dispenser->motor));
             ESP_LOGI(TAG, "Seed dispenser break");
             break;
@@ -118,12 +118,12 @@ static void seed_planter_pid_loop_cb(void *args)
     float cutter_disc_new_speed = 0.0f;
 
     // If the vehicle is in break or coast state, the speed PID should not interfere
-    if (last_cutter_disc_state != BREAK && last_cutter_disc_state != COAST)
+    if (last_cutter_disc_state != BRAKE && last_cutter_disc_state != COAST)
     {
         pid_compute(cutter_disc->pid_ctrl, cutter_disc_error, &cutter_disc_new_speed);
         bdc_motor_set_speed(cutter_disc->motor, (uint32_t)cutter_disc_new_speed);
     }
-    if (last_seed_dispenser_state != BREAK && last_seed_dispenser_state != COAST)
+    if (last_seed_dispenser_state != BRAKE && last_seed_dispenser_state != COAST)
     {
         pid_compute(seed_dispenser->pid_ctrl, seed_dispenser_error, &seed_dispenser_new_speed);
         bdc_motor_set_speed(seed_dispenser->motor, (uint32_t)seed_dispenser_new_speed);

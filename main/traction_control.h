@@ -9,16 +9,24 @@
  * @param state 
  * @return esp_err_t 
  */
-esp_err_t traction_set_direction(motor_pair_state_e *state);
+esp_err_t traction_control_set_direction(const motor_pair_state_e state);
 
 /**
  * @brief 
  * 
- * @param motor_left_speed 
- * @param motor_right_speed 
+ * @param motor_left_speed in rev/s 
+ * @param motor_right_speed in rev/s
  * @return esp_err_t 
  */
-esp_err_t traction_set_speed(float *motor_left_speed, float *motor_right_speed);
+esp_err_t traction_control_set_speed(float motor_left_speed, float motor_right_speed);
+
+/**
+ * @brief 
+ * 
+ * @param target_speed 
+ * @return esp_err_t 
+ */
+esp_err_t traction_control_smooth_start(float target_speed);
 
 /**
  * @brief Traction control task start

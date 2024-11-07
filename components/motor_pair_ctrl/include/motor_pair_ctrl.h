@@ -50,8 +50,6 @@ typedef struct
     int motor_right_desired_speed;
     float motor_left_error;
     float motor_right_error;
-    // float motor_right_new_speed;
-    // float motor_left_new_speed;
 } motor_pair_data_t;
 
 typedef struct
@@ -61,7 +59,7 @@ typedef struct
     pid_ctrl_block_handle_t pid_ctrl;
     char motor_id[20];
     int report_pulses;
-    queue_t speed_queue;
+    queue_t *speed_queue;
     int desired_speed; // In pulses
 } motor_control_context_t;
 
@@ -74,7 +72,7 @@ typedef struct
 
 typedef enum
 {
-    BREAK, // Stop motor in a break way (Slow decay)
+    BRAKE, // Stop motor in a break way (Slow decay)
     COAST, // Stop motor in a coast way (aka Fast Decay)
     FORWARD,
     REVERSE,
@@ -85,14 +83,14 @@ typedef enum
 } motor_pair_state_e;
 
 /**
- * @brief Calculate bezier curve points for smooth start. The start value will always be 0 
+ * @brief Calculate LSPB curve points for smooth start. The start value will always be 0 
  * 
  * @param no_points Each point will be applied each pid period 
- * @param final_value PWM value
+ * @param final_value rev/s
  * @param pvPoints 
  * @return esp_err_t 
  */
-// esp_err_t calculate_lspb_speed_curve(const uint32_t *no_points, uint32_t *final_value, uint32_t *pvPoints);
+esp_err_t calculate_lspb_speed_curve(const uint32_t tf, float qf, float *pvPoints);
 
 
 /**
@@ -100,7 +98,7 @@ typedef enum
  * 
  * @return esp_err_t 
  */
-esp_err_t motor_pair_smooth_start(void);
+esp_err_t motor_pair_smooth_start(motor_pair_handle_t *pvMotor, float target_speed);
 
 /**
  * @brief Set motors desiered speed. Speed can be positive or negative.
@@ -108,7 +106,7 @@ esp_err_t motor_pair_smooth_start(void);
  * @param motor_right_speed 
  * @return esp_err_t 
  */
-esp_err_t motor_pair_set_speed(int *motor_left_speed, int *motor_right_speed, motor_pair_handle_t *motor_pair);
+esp_err_t motor_pair_set_speed(int motor_left_speed, int motor_right_speed, motor_pair_handle_t *motor_pair);
 
 
 /**

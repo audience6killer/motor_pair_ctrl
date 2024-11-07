@@ -19,26 +19,26 @@ static const char TAG[] = "traction_control";
 
 static motor_pair_handle_t *traction_handle = NULL;
 static QueueHandle_t traction_queue_handle;
-static motor_pair_state_e g_traction_state = BREAK;
-
+static motor_pair_state_e g_traction_state = BRAKE;
+static motor_pair_data_t traction_data;
 
 static void traction_pid_loop_cb(void *args)
 {
     static int motor_left_last_pulse_count = 0;
     static int motor_right_last_pulse_count = 0;
-    static motor_pair_state_e last_traction_state = BREAK;
+    static motor_pair_state_e last_traction_state = BRAKE;
 
     // Where will be saved the current info for the motor pair
-    motor_pair_data_t *pair_data = (motor_pair_data_t*)args;
+    // motor_pair_data_t *pair_data = (motor_pair_data_t *)args;
 
-    // Calculate current speed 
+    // Calculate current speed
     int motor_left_cur_pulse_count = 0;
     int motor_right_cur_pulse_count = 0;
     pcnt_unit_get_count(traction_handle->motor_left_ctx.pcnt_encoder, &motor_left_cur_pulse_count);
     pcnt_unit_get_count(traction_handle->motor_right_ctx.pcnt_encoder, &motor_right_cur_pulse_count);
 
     // The sign of the speed doesn't matter, as the forward and reverse of the motor will control the direction of the spin
-    
+
     int motor_left_real_pulses = abs(motor_left_cur_pulse_count - motor_left_last_pulse_count);
     int motor_right_real_pulses = abs(motor_right_cur_pulse_count - motor_right_last_pulse_count);
 
@@ -48,7 +48,7 @@ static void traction_pid_loop_cb(void *args)
     traction_handle->motor_right_ctx.report_pulses = motor_right_real_pulses;
     traction_handle->motor_left_ctx.report_pulses = motor_left_real_pulses;
 
-    // Check whether the state has changed 
+    // Check whether the state has changed
 
     if (last_traction_state != g_traction_state)
     {
@@ -56,7 +56,7 @@ static void traction_pid_loop_cb(void *args)
 
         switch (g_traction_state)
         {
-        case BREAK:
+        case BRAKE:
             ESP_ERROR_CHECK(bdc_motor_brake(traction_handle->motor_left_ctx.motor));
             ESP_ERROR_CHECK(bdc_motor_brake(traction_handle->motor_right_ctx.motor));
             ESP_LOGI(TAG, "BREAK");
@@ -70,7 +70,7 @@ static void traction_pid_loop_cb(void *args)
         case FORWARD:
             ESP_ERROR_CHECK(bdc_motor_forward(traction_handle->motor_left_ctx.motor));
             ESP_ERROR_CHECK(bdc_motor_forward(traction_handle->motor_right_ctx.motor));
-            ESP_LOGI(TAG, "FORWARD");
+            ESP_LOGI(TAG, "TRACTION_CONTROL_STATE: FORWARD");
             break;
         case REVERSE:
             ESP_ERROR_CHECK(bdc_motor_reverse(traction_handle->motor_left_ctx.motor));
@@ -104,8 +104,20 @@ static void traction_pid_loop_cb(void *args)
     }
 
     // If the vehicle is in break or coast state, the speed PID should not interfere
-    if (last_traction_state == BREAK || last_traction_state == COAST)
+    if (last_traction_state == BRAKE || last_traction_state == COAST)
         return;
+
+    // Check wheater there is another speed value in the queue
+    if (is_queue_empty(traction_handle->motor_left_ctx.speed_queue) == 0)
+    {
+        traction_handle->motor_left_ctx.desired_speed = dequeue(traction_handle->motor_left_ctx.speed_queue);
+        ESP_LOGI(TAG, "PID LOOP: Left Motor DS: %d", traction_handle->motor_left_ctx.desired_speed);
+    }
+    if (is_queue_empty(traction_handle->motor_right_ctx.speed_queue) == 0)
+    {
+        traction_handle->motor_right_ctx.desired_speed = dequeue(traction_handle->motor_right_ctx.speed_queue);
+        ESP_LOGI(TAG, "PID LOOP: Right Motor DS: %d", traction_handle->motor_right_ctx.desired_speed);
+    }
 
     // Calculate speed error
     float motor_left_error = traction_handle->motor_left_ctx.desired_speed - motor_left_real_pulses;
@@ -118,75 +130,50 @@ static void traction_pid_loop_cb(void *args)
     pid_compute(traction_handle->motor_right_ctx.pid_ctrl, motor_right_error, &motor_right_new_speed);
     pid_compute(traction_handle->motor_left_ctx.pid_ctrl, motor_left_error, &motor_left_new_speed);
 
-    bdc_motor_set_speed(traction_handle->motor_right_ctx.motor, (uint32_t)motor_right_new_speed);
-    bdc_motor_set_speed(traction_handle->motor_left_ctx.motor, (uint32_t)motor_left_new_speed);
+    ESP_ERROR_CHECK(bdc_motor_set_speed(traction_handle->motor_right_ctx.motor, (uint32_t)motor_right_new_speed));
+    ESP_ERROR_CHECK(bdc_motor_set_speed(traction_handle->motor_left_ctx.motor, (uint32_t)motor_left_new_speed));
+    //bdc_motor_forward(traction_handle->motor_right_ctx.motor);
+    // ESP_ERROR_CHECK(bdc_motor_set_speed(traction_handle->motor_right_ctx.motor, 32));
 
     // Save information
-    pair_data->motor_left_error = motor_left_error;
-    pair_data->motor_right_error = motor_right_error;
-    pair_data->motor_left_real_pulses = motor_left_real_pulses;
-    pair_data->motor_right_real_pulses = motor_right_real_pulses;
-    pair_data->motor_left_desired_speed = traction_handle->motor_left_ctx.desired_speed;
-    pair_data->motor_right_desired_speed = traction_handle->motor_right_ctx.desired_speed;
+    traction_data.motor_left_error = motor_left_error;
+    traction_data.motor_right_error = motor_right_error;
+    traction_data.motor_left_real_pulses = motor_left_real_pulses;
+    traction_data.motor_right_real_pulses = motor_right_real_pulses;
+    traction_data.motor_left_desired_speed = traction_handle->motor_left_ctx.desired_speed;
+    traction_data.motor_right_desired_speed = traction_handle->motor_right_ctx.desired_speed;
+    //ESP_LOGI(TAG, "left_new_speed: %f, right_new_speed: %f", motor_left_new_speed, motor_right_new_speed);
+    //ESP_LOGI(TAG, "INSIDE LOOP");
 }
 
-esp_err_t traction_set_direction(motor_pair_state_e *state)
+esp_err_t traction_control_set_direction(const motor_pair_state_e state)
 {
     // TODO: Some kind of verification might be necessary
-    g_traction_state = *state;
+    g_traction_state = state;
 
     return ESP_OK;
 }
 
 /**
  * @brief Set the speed for both motors. Both in rad/s
- * 
- * @param motor_left_speed 
- * @param motor_right_speed 
- * @return esp_err_t 
+ *
+ * @param motor_left_speed
+ * @param motor_right_speed
+ * @return esp_err_t
  */
-esp_err_t traction_set_speed(float *motor_left_speed, float *motor_right_speed)
+esp_err_t traction_control_set_speed(float motor_left_speed, float motor_right_speed)
 {
-    int speed = 0;
-
-    if (motor_left_speed == NULL && motor_right_speed == NULL)
+    if (motor_left_speed <= TRACTION_M_LEFT_MAX_SPEED_REVS && motor_right_speed <= TRACTION_M_RIGHT_MAX_SPEED_REVS)
     {
-        ESP_LOGE(TAG, "Speed provided for both motors is NULL");
-        return ESP_FAIL;
-    }
-
-    if (motor_left_speed == NULL)
-        speed = (int)floor(*motor_right_speed * TRACTION_M_RIGHT_REVS2PULSES);
-    else if(motor_right_speed == NULL)
-       speed = (int)floor(*motor_left_speed * TRACTION_M_LEFT_REV2PULSES);
-
-    if (motor_left_speed == NULL || motor_right_speed == NULL)
-    {
-        if(*motor_left_speed <= TRACTION_M_LEFT_MAX_SPEED_REVS && *motor_right_speed <= TRACTION_M_RIGHT_MAX_SPEED_REVS)
-        {
-            int left_speed = (int)floor(*motor_left_speed * TRACTION_M_LEFT_REV2PULSES);
-            int right_speed = (int)floor(*motor_right_speed * TRACTION_M_LEFT_REV2PULSES);
-            ESP_ERROR_CHECK(motor_pair_set_speed(&left_speed, &right_speed, traction_handle));
-
-        }
-        else
-        {
-            ESP_LOGE(TAG, "Speed desired was out of bounds");
-            return ESP_FAIL;
-        }
-        
+        int pulses_left_speed = (int)floor(motor_left_speed * TRACTION_M_LEFT_REV2PULSES);
+        int pulses_right_speed = (int)floor(motor_right_speed * TRACTION_M_RIGHT_REV2PULSES);
+        ESP_ERROR_CHECK(motor_pair_set_speed(pulses_left_speed, pulses_right_speed, traction_handle));
+        ESP_LOGI(TAG, "Speed set: %f", motor_left_speed);
     }
     else
     {
-        if (speed <= MAX(*motor_left_speed, *motor_right_speed))
-        {
-            motor_pair_set_speed(&speed, &speed, traction_handle);
-        }
-        else
-        {
-            ESP_LOGE(TAG, "Speed desired was out of bounds %d", speed);
-            return ESP_FAIL;
-        }
+        ESP_LOGE(TAG, "Speed set was out of bounds!");
+        return ESP_FAIL;
     }
 
     return ESP_OK;
@@ -230,6 +217,7 @@ static void traction_control_task(void *pvParameters)
         .mcpwm_group = TRACTION_MOTORS_MCPWM_GROUP,
         .pwm_freq_hz = TRACTION_MOTORS_PWM_FREQ,
         .pid_loop_period = BDC_PID_LOOP_PERIOD_MS,
+        .bdc_mcpwm_timer_resolution_hz = BDC_MCPWM_TIMER_RESOLUTION_HZ,
     };
 
     motor_pair_config_t traction_control_config = {
@@ -241,33 +229,66 @@ static void traction_control_task(void *pvParameters)
     ESP_ERROR_CHECK(motor_pair_init(&traction_control_config, traction_handle));
 
     // Setting up timer
-    motor_pair_data_t traction_data;
+    // motor_pair_data_t traction_data;
     const esp_timer_create_args_t traction_timer_args = {
         .callback = traction_pid_loop_cb,
-        .arg = &traction_data,
+        .arg = NULL,
         .name = "traction_pid_loop",
     };
 
     esp_timer_handle_t traction_pid_loop_timer = NULL;
     ESP_ERROR_CHECK(esp_timer_create(&traction_timer_args, &traction_pid_loop_timer));
 
+    ESP_LOGI(TAG, "Enabling motor: %s", traction_handle->motor_left_ctx.motor_id);
+    ESP_ERROR_CHECK(bdc_motor_enable(traction_handle->motor_left_ctx.motor));
+
+    ESP_LOGI(TAG, "Enabling motor: %s", traction_handle->motor_right_ctx.motor_id);
+    ESP_ERROR_CHECK(bdc_motor_enable(traction_handle->motor_right_ctx.motor));
+
+    ESP_ERROR_CHECK(bdc_motor_brake(traction_handle->motor_left_ctx.motor));
+    ESP_ERROR_CHECK(bdc_motor_brake(traction_handle->motor_right_ctx.motor));
+
     ESP_LOGI(TAG, "Starting motor speed loop");
     ESP_ERROR_CHECK(esp_timer_start_periodic(traction_pid_loop_timer, traction_bdc_conf.pid_loop_period * 1000));
 
+    //ESP_ERROR_CHECK( bdc_motor_disable(traction_handle->motor_right_ctx.motor) );
+    //ESP_ERROR_CHECK( bdc_motor_enable(traction_handle->motor_right_ctx.motor) );
+    // Set initial speed
+    float initial_speed = 1.688f;
+    traction_control_set_speed(initial_speed, initial_speed);
+    //traction_control_set_direction(FORWARD);
+    //ESP_ERROR_CHECK( bdc_motor_set_speed(traction_handle->motor_left_ctx.motor, 100) );
+    //ESP_ERROR_CHECK( bdc_motor_set_speed(traction_handle->motor_right_ctx.motor, 100) );
     // Setting up queue
     traction_queue_handle = xQueueCreate(4, sizeof(motor_pair_data_t));
 
-    for(;;)
+    for (;;)
     {
-        if(xQueueSend(traction_queue_handle, &traction_data, portMAX_DELAY) != pdPASS)
-        {
-            ESP_LOGE(TAG, "Error sending data to queue");
-        }
+        // #if SERIAL_DEBUG_ENABLE
+        // printf()
+        printf("/*left_desired_speed:%d, speed_left,%d; right_des_speed: %d, speed_right, %d*/\r\n", traction_data.motor_left_desired_speed, traction_data.motor_left_real_pulses, traction_data.motor_right_desired_speed, traction_data.motor_right_real_pulses);
+        // #endif
+        // ESP_LOGI(TAG, "exec task!!!");
+        // if (xQueueSend(traction_queue_handle, &traction_data, portMAX_DELAY) != pdPASS)
+        //{
+        //     ESP_LOGE(TAG, "Error sending data to queue");
+        // }
         vTaskDelay(pdMS_TO_TICKS(500));
     }
-
 }
 
+esp_err_t traction_control_smooth_start(float target_speed)
+{
+    if (traction_handle == NULL)
+        return ESP_FAIL;
+
+    traction_control_set_direction(FORWARD);
+
+    ESP_LOGI(TAG, "Beginning smooth start");
+    motor_pair_smooth_start(traction_handle, target_speed);
+
+    return ESP_OK;
+}
 
 void traction_control_start_task(void)
 {
