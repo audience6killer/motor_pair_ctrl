@@ -10,7 +10,7 @@ queue_t* create_queue(int capacity) {
     queue_t *queue = (queue_t *)malloc(sizeof(queue_t));
     if (!queue) return NULL;
 
-    queue->data = (int *)malloc(capacity * sizeof(int));
+    queue->data = (float *)malloc(capacity * sizeof(float));
     if (!queue->data) {
         free(queue);
         return NULL;
@@ -53,32 +53,33 @@ int queue_size(queue_t *queue)
     return queue->size;
 }
 
-int enqueue(queue_t *queue, int data) {
+int enqueue(queue_t *queue, float data) {
     if (is_queue_full(queue)) {
-        return -1;
+        printf("Queue is full");
+        return -1.0f;
     }
 
-    printf("Added value to queue: %d\n", data);
+    //printf("Added value to queue: %f\n", data);
     queue->data[queue->tail] = data;
     queue->tail = (queue->tail + 1) % queue->capacity;
     queue->size++;
 
-    return 1;
+    return 1.0f;
 }
 
-int dequeue(queue_t *queue) {
+float dequeue(queue_t *queue) {
     if (is_queue_empty(queue)) {
-        return -1;
+        return -1.0f;
     }
 
-    int dequeued_value = queue->data[queue->head];
+    float dequeued_value = queue->data[queue->head];
     queue->head = (queue->head + 1) % queue->capacity;
     queue->size--;
 
     return dequeued_value;
 }
 
-int front(queue_t *queue) {
+float front(queue_t *queue) {
     if (is_queue_empty(queue)) {
         return -1;
     } else {
@@ -86,7 +87,7 @@ int front(queue_t *queue) {
     }
 }
 
-int back(queue_t *queue)
+float back(queue_t *queue)
 {
     if (is_queue_empty(queue)) {
         return -1;
@@ -94,7 +95,16 @@ int back(queue_t *queue)
         return queue->data[queue->tail];
     }
 }
-
+void queue_print(queue_t *queue)
+{
+  if (queue->size != 0) 
+  {
+    for (int i = 0; i < queue->size; i++) 
+    {
+      printf("%d, %f\n", i, (float)queue->data[i]);
+    }
+  }
+}
 void destroy_queue(queue_t *queue) {
     free(queue->data);
     free(queue);

@@ -26,17 +26,45 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #endif
 
+#define SPEED_QUEUE_SIZE    500
+
 static const char TAG[] = "motor_pair";
 
-esp_err_t calculate_lspb_speed_curve(const uint32_t tf, float qf, float *pvPoints)
+esp_err_t calculate_lspb_speed_point(const int tf, int t, const float qf, float accel, float *pvPoint)
 {
-    //const uint32_t tf = (*no_points);
-    // const float qf = (*f_speed);
+    const float V = accel;
+    const float q0 = 0.0f;
+    const float t0 = 0.0f;
+    const float tb = (q0 - qf + V * tf) / (V);
 
-    // Allocate point array
-    // pvPoints = (float *)malloc((tf) * sizeof(float));
+    float point = 0.0f;
 
-    const float V = 0.025f;
+    if (t >= t0 && t < tb)
+    {
+        point = q0 + V / (2 * tb) * pow(t, 2);
+    }
+    else if (t >= tb && t < tf - tb)
+    {
+        point = (qf + q0 - V * tf) / 2 + V * t;
+    }
+    else if (t >= tf - tb)
+    {
+        point = qf - (V * pow(tf, 2)) / (2 * tb) + (V * tf) / tb * t - V / (2 * tb) * pow(t, 2);
+    }
+    else
+    {
+        ESP_LOGE(TAG, "lspb curve time value out of bounds!");
+        return ESP_FAIL;
+    }
+
+    *pvPoint = point;
+
+    return ESP_OK;
+}
+
+esp_err_t calculate_lspb_speed_curve(const int tf, float qf, float accel, float *pvPoints)
+{
+    const float V = accel;
     const float q0 = 0.0f;
     const float t0 = 0.0f;
     const float tb = (q0 - qf + V * tf) / (V);
@@ -72,23 +100,24 @@ esp_err_t calculate_lspb_speed_curve(const uint32_t tf, float qf, float *pvPoint
 esp_err_t motor_pair_smooth_start(motor_pair_handle_t *pvMotor, float target_speed)
 {
     // Target speed: 1.688f
-    const int no_points = 100;
-    float speed_points[no_points]; 
-    calculate_lspb_speed_curve(no_points, target_speed, speed_points);
+    //const int no_points = 500;
+    float speed_points[SPEED_QUEUE_SIZE]; 
+    float accel = 0.0065f;
+    ESP_ERROR_CHECK( calculate_lspb_speed_curve(SPEED_QUEUE_SIZE, target_speed, accel, &speed_points) );
 
     if(queue_size(pvMotor->motor_left_ctx.speed_queue) != 0)
         empty_queue(pvMotor->motor_left_ctx.speed_queue);
     if(queue_size(pvMotor->motor_right_ctx.speed_queue) != 0)
         empty_queue(pvMotor->motor_right_ctx.speed_queue);    
 
-    for (size_t i = 0; i < no_points; i++)
+    for (size_t i = 0; i < SPEED_QUEUE_SIZE; i++)
     {
-        if (enqueue(pvMotor->motor_left_ctx.speed_queue, speed_points[i]) == -1 || enqueue(pvMotor->motor_right_ctx.speed_queue, speed_points[i]) == -1)
+        if (enqueue(pvMotor->motor_left_ctx.speed_queue, speed_points[i]) == -1.0f || enqueue(pvMotor->motor_right_ctx.speed_queue, speed_points[i]) == -1.0f)
         {
             return ESP_FAIL;
         }
     }
-
+    //queue_print(pvMotor->motor_left_ctx.speed_queue);
     return ESP_OK;
 }
 
@@ -178,8 +207,8 @@ esp_err_t motor_pair_init_individual_motor(motor_config_t *motor_config, motor_p
     pvMotor->pid_ctrl = motor_pid_ctrl;
 
     // Motor queue setup
-    int speed_queue_size = 100; // For the smooth start
-    pvMotor->speed_queue = create_queue(speed_queue_size);
+    //int speed_queue_size = 500; // For the smooth start
+    pvMotor->speed_queue = create_queue(SPEED_QUEUE_SIZE);
 
     // Starting system
     // ESP_LOGI(TAG, "Starting encoder unit: %s", pvMotor->motor_id);
@@ -199,24 +228,18 @@ esp_err_t motor_pair_init_individual_motor(motor_config_t *motor_config, motor_p
 
 esp_err_t motor_pair_set_speed(int motor_left_speed, int motor_right_speed, motor_pair_handle_t *motor_pair)
 {
-    /*if (motor_left_speed == NULL || motor_right_speed == NULL)
-    {
-        ESP_LOGE(TAG, "Speed provided for the motors is NULL");
-        return ESP_FAIL;
-    }*/
-
-    if (enqueue(motor_pair->motor_left_ctx.speed_queue, motor_left_speed) == -1)
-    {
-        ESP_LOGE(TAG, "Cannot enqueue value to %s queue", motor_pair->motor_left_ctx.motor_id);
-        return ESP_FAIL;
-    }
-    if (enqueue(motor_pair->motor_right_ctx.speed_queue, motor_right_speed) == -1)
-    {
-        ESP_LOGE(TAG, "Cannot enqueue value to %s queue", motor_pair->motor_right_ctx.motor_id);
-        return ESP_FAIL;
-    }
-    // motor_pair->motor_left_ctx.desired_speed = *motor_left_speed;
-    // motor_pair->motor_right_ctx.desired_speed = *motor_right_speed;
+    //if (enqueue(motor_pair->motor_left_ctx.speed_queue, motor_left_speed) == -1)
+    //{
+    //    ESP_LOGE(TAG, "Cannot enqueue value to %s queue", motor_pair->motor_left_ctx.motor_id);
+    //    return ESP_FAIL;
+    //}
+    //if (enqueue(motor_pair->motor_right_ctx.speed_queue, motor_right_speed) == -1)
+    //{
+    //    ESP_LOGE(TAG, "Cannot enqueue value to %s queue", motor_pair->motor_right_ctx.motor_id);
+    //    return ESP_FAIL;
+    //}
+    motor_pair->motor_left_ctx.desired_speed = motor_left_speed;
+    motor_pair->motor_right_ctx.desired_speed = motor_right_speed;
 
     return ESP_OK;
 }

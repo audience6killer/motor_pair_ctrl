@@ -218,7 +218,7 @@ void seed_planter_control_start_task(void)
 {
     ESP_LOGI(TAG, "Initializing seed_planter task");
 
-    xTaskCreatePinnedToCore(&seed_planter_control_start_task,
+    xTaskCreatePinnedToCore(&seed_planter_control_task,
                             "seed_planter_control",
                             SEED_PLANTER_STACK_SIZE,
                             NULL,

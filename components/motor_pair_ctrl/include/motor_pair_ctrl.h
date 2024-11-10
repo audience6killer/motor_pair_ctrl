@@ -90,7 +90,7 @@ typedef enum
  * @param pvPoints 
  * @return esp_err_t 
  */
-esp_err_t calculate_lspb_speed_curve(const uint32_t tf, float qf, float *pvPoints);
+esp_err_t calculate_lspb_speed_curve(const int tf, float qf, float accel, float *pvPoints);
 
 
 /**
