@@ -10,7 +10,9 @@ static const char TAG[] = "test_traction_control";
 static void test_traction_control_task(void *pvParameters)
 {
     const float target_speed = 1.688f;
-    traction_control_smooth_start(target_speed);
+    //const float target_speed = 1.000f;
+    const int tf = 500;
+    traction_control_soft_start(target_speed, tf);
     //traction_control_set_direction(FORWARD);
     //traction_control_set_speed(target_speed, target_speed);
     for(;;)

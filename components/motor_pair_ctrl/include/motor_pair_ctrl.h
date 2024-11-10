@@ -44,10 +44,10 @@ typedef struct
 
 typedef struct
 {
-    int motor_left_real_pulses;
-    int motor_right_real_pulses;
-    int motor_left_desired_speed;
-    int motor_right_desired_speed;
+    float motor_left_real_pulses;
+    float motor_right_real_pulses;
+    float motor_left_desired_speed;
+    float motor_right_desired_speed;
     float motor_left_error;
     float motor_right_error;
 } motor_pair_data_t;
@@ -74,6 +74,7 @@ typedef enum
 {
     BRAKE, // Stop motor in a break way (Slow decay)
     COAST, // Stop motor in a coast way (aka Fast Decay)
+    STARTING,
     FORWARD,
     REVERSE,
     TURN_LEFT_FORWARD, // All turns are on its axis
@@ -81,6 +82,9 @@ typedef enum
     TURN_LEFT_REVERSE,
     TURN_RIGHT_REVERSE,
 } motor_pair_state_e;
+
+
+esp_err_t calculate_lspb_speed_point(const int tf, int t, const float qf, float *pvPoint);
 
 /**
  * @brief Calculate LSPB curve points for smooth start. The start value will always be 0 
@@ -108,6 +112,15 @@ esp_err_t motor_pair_smooth_start(motor_pair_handle_t *pvMotor, float target_spe
  */
 esp_err_t motor_pair_set_speed(int motor_left_speed, int motor_right_speed, motor_pair_handle_t *motor_pair);
 
+/**
+ * @brief Speed have to be in rev/s 
+ * 
+ * @param motor_left_speed 
+ * @param motor_right_speed 
+ * @param motor_pair 
+ * @return esp_err_t 
+ */
+esp_err_t motor_pair_add_speed_to_queue(float motor_left_speed, float motor_right_speed, motor_pair_handle_t *motor_pair);
 
 /**
  * @brief Initialize motor pair unit

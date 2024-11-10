@@ -44,12 +44,14 @@
 #define MOTOR_LEFT_MAX_SPEED            50
 #define MOTOR_RIGHT_MAX_SPEED           38
 
-#define TRACTION_M_RIGHT_MAX_SPEED_REVS      1.854f
-#define TRACTION_M_LEFT_MAX_SPEED_REVS       5.876f
+#define TRACTION_M_RIGHT_MAX_SPEED_REVS     1.854f
+#define TRACTION_M_LEFT_MAX_SPEED_REVS      5.876f
 
 #define TRACTION_M_RIGHT_REV2PULSES         20 / 1.03
-#define TRACTION_M_LEFT_REV2PULSES           10 / 1.13
+#define TRACTION_M_LEFT_REV2PULSES          10 / 1.13
+#define TRACTION_M_RIGHT_PULSES2REV         0.0515f
+#define TRACTION_M_LEFT_PULSES2REV          0.113f
 
-#define SERIAL_DEBUG_ENABLE             true
+#define SERIAL_DEBUG_ENABLE           true 
 
 #endif

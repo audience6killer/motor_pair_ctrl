@@ -26,15 +26,18 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #endif
 
-#define SPEED_QUEUE_SIZE    500
+#define SPEED_QUEUE_SIZE    10
 
 static const char TAG[] = "motor_pair";
 
-esp_err_t calculate_lspb_speed_point(const int tf, int t, const float qf, float accel, float *pvPoint)
+esp_err_t calculate_lspb_speed_point(const int tf, int t, const float qf, float *pvPoint)
 {
-    const float V = accel;
+    //total_time = tf - t0
+    //total_distance = qf - q0
+    //V = (4 * total_distance) / (3 * total_time)
     const float q0 = 0.0f;
     const float t0 = 0.0f;
+    const float V = (4 * (qf - q0)) / (3 * (tf - t0));
     const float tb = (q0 - qf + V * tf) / (V);
 
     float point = 0.0f;
@@ -228,18 +231,16 @@ esp_err_t motor_pair_init_individual_motor(motor_config_t *motor_config, motor_p
 
 esp_err_t motor_pair_set_speed(int motor_left_speed, int motor_right_speed, motor_pair_handle_t *motor_pair)
 {
-    //if (enqueue(motor_pair->motor_left_ctx.speed_queue, motor_left_speed) == -1)
-    //{
-    //    ESP_LOGE(TAG, "Cannot enqueue value to %s queue", motor_pair->motor_left_ctx.motor_id);
-    //    return ESP_FAIL;
-    //}
-    //if (enqueue(motor_pair->motor_right_ctx.speed_queue, motor_right_speed) == -1)
-    //{
-    //    ESP_LOGE(TAG, "Cannot enqueue value to %s queue", motor_pair->motor_right_ctx.motor_id);
-    //    return ESP_FAIL;
-    //}
     motor_pair->motor_left_ctx.desired_speed = motor_left_speed;
     motor_pair->motor_right_ctx.desired_speed = motor_right_speed;
+
+    return ESP_OK;
+}
+
+esp_err_t motor_pair_add_speed_to_queue(float motor_left_speed, float motor_right_speed, motor_pair_handle_t *motor_pair)
+{
+    enqueue(motor_pair->motor_left_ctx.speed_queue, motor_left_speed);
+    enqueue(motor_pair->motor_right_ctx.speed_queue, motor_right_speed);
 
     return ESP_OK;
 }

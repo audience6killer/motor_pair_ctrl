@@ -28,6 +28,9 @@ esp_err_t traction_control_set_speed(float motor_left_speed, float motor_right_s
  */
 esp_err_t traction_control_smooth_start(float target_speed);
 
+
+esp_err_t traction_control_soft_start(float target_speed, int tf);
+
 /**
  * @brief Traction control task start
  *
