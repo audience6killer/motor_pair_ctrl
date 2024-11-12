@@ -24,16 +24,22 @@
 esp_err_t traction_control_set_direction(const motor_pair_state_e state);
 
 /**
- * @brief The speed should be positive
- * 
- * @param motor_left_speed in rev/s 
- * @param motor_right_speed in rev/s
- * @return esp_err_t 
+ * @brief Set the speed in pulses for both motors. 
+ * @param motor_left_speed in rad/s
+ * @param motor_right_speed in rad/s 
+ * @return esp_err_t
  */
 esp_err_t traction_control_set_speed(float motor_left_speed, float motor_right_speed);
 
-// TODO
-// esp_err_t traction_control_speed_controlled_direction(float motor_left_speed, float motor_right_speed);
+/**
+ * @brief The speed can be positive or negative. The funcion will handle the change of spin direction of
+ * the wheels
+ * 
+ * @param motor_left_speed in rev/s
+ * @param motor_right_speed in rev/s
+ * @return esp_err_t 
+ */
+esp_err_t traction_control_speed_controlled_direction(float motor_left_speed, float motor_right_speed);
 
 /**
  * @brief Soft start for motors using a LSPB speed trajectory

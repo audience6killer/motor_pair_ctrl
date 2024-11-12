@@ -178,18 +178,13 @@ esp_err_t traction_control_set_direction(const motor_pair_state_e state)
 {
     // TODO: Some kind of verification might be necessary
     g_traction_state = state;
+    // TODO: This is here because I don't know how to initialize the value yet
     traction_data.state = state;
 
     return ESP_OK;
 }
 
-/**
- * @brief Set the speed for both motors. Both in rad/s
- *
- * @param motor_left_speed
- * @param motor_right_speed
- * @return esp_err_t
- */
+
 esp_err_t traction_control_set_speed(float motor_left_speed, float motor_right_speed)
 {
     if (motor_left_speed <= TRACTION_M_LEFT_MAX_SPEED_REVS && motor_right_speed <= TRACTION_M_RIGHT_MAX_SPEED_REVS)
@@ -202,6 +197,36 @@ esp_err_t traction_control_set_speed(float motor_left_speed, float motor_right_s
     else
     {
         ESP_LOGE(TAG, "Speed set was out of bounds!");
+        return ESP_FAIL;
+    }
+
+    return ESP_OK;
+}
+
+esp_err_t traction_control_speed_controlled_direction(float motor_left_speed, float motor_right_speed)
+{
+    float motor_left_abs = (float)fabs(motor_left_speed);
+    float motor_right_abs = (float)fabs(motor_right_speed);
+
+    if (motor_left_abs <= TRACTION_M_LEFT_MAX_SPEED_REVS && motor_right_abs <= TRACTION_M_RIGHT_MAX_SPEED_REVS)
+    {
+        if(motor_left_speed < 0.0f && motor_right_speed < 0.0f)
+            traction_control_set_direction(REVERSE);
+        else if(motor_left_speed < 0.0f && motor_right_speed >= 0.0f)
+            traction_control_set_direction(TURN_LEFT_FORWARD);
+        else if(motor_left_speed >= 0.0f && motor_right_speed < 0.0f)
+            traction_control_set_direction(TURN_RIGHT_FORWARD);
+        else if(motor_left_speed > 0.0f && motor_right_speed > 0.0f)
+            traction_control_set_direction(FORWARD);
+        else
+            traction_control_set_direction(BRAKE);
+
+        motor_pair_add_speed_to_queue(motor_left_abs, motor_right_abs, traction_handle);
+        // ESP_LOGI(TAG, "Speed set left: %f, Speed set right: %f", motor_left_speed, motor_right_speed);
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Speed Controller: Speed set was out of bounds!");
         return ESP_FAIL;
     }
 

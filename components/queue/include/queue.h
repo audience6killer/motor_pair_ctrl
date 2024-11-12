@@ -13,6 +13,8 @@
 
 const static int MAX_QUEUE_CAPACITY = 1000;
 
+// TODO refactor to include esp_err_t
+
 typedef struct 
 {
     int head, tail, capacity, size;
