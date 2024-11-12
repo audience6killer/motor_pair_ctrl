@@ -11,6 +11,8 @@
 #ifndef TRACTION_CONTROL_H
 #define TRACTION_CONTROL_H
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
 #include "motor_pair_ctrl.h"
 
 /**
@@ -41,6 +43,13 @@ esp_err_t traction_control_set_speed(float motor_left_speed, float motor_right_s
  * @return esp_err_t 
  */
 esp_err_t traction_control_soft_start(float target_speed, int tf);
+
+/**
+ * @brief 
+ * 
+ * @return QueueHandle_t 
+ */
+QueueHandle_t traction_control_get_queue_handle(void);
 
 /**
  * @brief Traction control task start

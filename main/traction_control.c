@@ -119,12 +119,12 @@ static void traction_pid_loop_cb(void *args)
     {
         // During the soft start the queue will be ignored
         float point = 0.0f;
-        //float target_speed = (float)traction_handle->motor_left_ctx.desired_speed / TRACTION_M_LEFT_REV2PULSES;
+        // float target_speed = (float)traction_handle->motor_left_ctx.desired_speed / TRACTION_M_LEFT_REV2PULSES;
         calculate_lspb_speed_point(g_soft_start_tf, soft_start_counter, g_soft_start_target_speed, &point);
         traction_control_set_speed(point, point);
-        //ESP_LOGI(TAG, "soft start point: %f", point);
+        // ESP_LOGI(TAG, "soft start point: %f", point);
         soft_start_counter++;
-        if(soft_start_counter == SOFT_START_TF)
+        if (soft_start_counter == SOFT_START_TF)
         {
             g_soft_start_traction_active = false;
             traction_control_set_direction(FORWARD);
@@ -138,7 +138,7 @@ static void traction_pid_loop_cb(void *args)
             traction_control_set_speed(dequeue(traction_handle->motor_left_ctx.speed_queue), dequeue(traction_handle->motor_right_ctx.speed_queue));
         }
     }
-    
+
     // If the vehicle is in break or coast state, its not necessary to calculate the PID value
     if (last_traction_state != BRAKE && last_traction_state != COAST)
     {
@@ -171,7 +171,7 @@ static void traction_pid_loop_cb(void *args)
     traction_data.motor_left_desired_speed = traction_handle->motor_left_ctx.desired_speed * TRACTION_M_LEFT_PULSES2REV;
     traction_data.motor_right_desired_speed = traction_handle->motor_right_ctx.desired_speed * TRACTION_M_RIGHT_PULSES2REV;
 
-    //ESP_LOGI(TAG, "/*left_desired_speed,%f,speed_left,%f,right_des_speed,%f, speed_right,%f*/\r\n", traction_data.motor_left_desired_speed, traction_data.motor_left_real_pulses, traction_data.motor_right_desired_speed, traction_data.motor_right_real_pulses);
+    // ESP_LOGI(TAG, "/*left_desired_speed,%f,speed_left,%f,right_des_speed,%f, speed_right,%f*/\r\n", traction_data.motor_left_desired_speed, traction_data.motor_left_real_pulses, traction_data.motor_right_desired_speed, traction_data.motor_right_real_pulses);
 }
 
 esp_err_t traction_control_set_direction(const motor_pair_state_e state)
@@ -212,7 +212,7 @@ static void traction_control_task(void *pvParameters)
 {
     // Initialize traction_handle
     traction_handle = (motor_pair_handle_t *)malloc(sizeof(motor_pair_handle_t));
-    strcpy(traction_handle->id, "traction_control_pair"); 
+    strcpy(traction_handle->id, "traction_control_pair");
 
     // Configuration parameters
     // TODO remove repeated pwm freq param
@@ -257,7 +257,7 @@ static void traction_control_task(void *pvParameters)
         .motor_right_config = traction_right_config,
         .bdc_config = traction_bdc_conf,
     };
-    
+
     // Init motor pair unit
     ESP_ERROR_CHECK(motor_pair_init(&traction_control_config, traction_handle));
 
@@ -272,14 +272,14 @@ static void traction_control_task(void *pvParameters)
     esp_timer_handle_t traction_pid_loop_timer = NULL;
     ESP_ERROR_CHECK(esp_timer_create(&traction_timer_args, &traction_pid_loop_timer));
 
-    //ESP_LOGI(TAG, "Enabling motor: %s", traction_handle->motor_left_ctx.motor_id);
-    //ESP_ERROR_CHECK(bdc_motor_enable(traction_handle->motor_left_ctx.motor));
+    // ESP_LOGI(TAG, "Enabling motor: %s", traction_handle->motor_left_ctx.motor_id);
+    // ESP_ERROR_CHECK(bdc_motor_enable(traction_handle->motor_left_ctx.motor));
 
-    //ESP_LOGI(TAG, "Enabling motor: %s", traction_handle->motor_right_ctx.motor_id);
-    //ESP_ERROR_CHECK(bdc_motor_enable(traction_handle->motor_right_ctx.motor));
+    // ESP_LOGI(TAG, "Enabling motor: %s", traction_handle->motor_right_ctx.motor_id);
+    // ESP_ERROR_CHECK(bdc_motor_enable(traction_handle->motor_right_ctx.motor));
 
-    //ESP_ERROR_CHECK(bdc_motor_brake(traction_handle->motor_left_ctx.motor));
-    //ESP_ERROR_CHECK(bdc_motor_brake(traction_handle->motor_right_ctx.motor));
+    // ESP_ERROR_CHECK(bdc_motor_brake(traction_handle->motor_left_ctx.motor));
+    // ESP_ERROR_CHECK(bdc_motor_brake(traction_handle->motor_right_ctx.motor));
 
     // Enable motors
     ESP_ERROR_CHECK(motor_pair_enable_motors(traction_handle));
@@ -295,15 +295,15 @@ static void traction_control_task(void *pvParameters)
 
     for (;;)
     {
-        #if SERIAL_DEBUG_ENABLE
-        // printf()
-        printf("/*left_desired_speed,%f,speed_left,%f,right_des_speed,%f, speed_right,%f,state,%d*/\r\n", traction_data.motor_left_desired_speed, traction_data.motor_left_real_pulses, traction_data.motor_right_desired_speed, traction_data.motor_right_real_pulses, traction_data.state);
-        #endif
+//#if SERIAL_DEBUG_ENABLE
+//        // printf()
+//        printf("/*left_desired_speed,%f,speed_left,%f,right_des_speed,%f, speed_right,%f,state,%d*/\r\n", traction_data.motor_left_desired_speed, traction_data.motor_left_real_pulses, traction_data.motor_right_desired_speed, traction_data.motor_right_real_pulses, traction_data.state);
+//#endif
         // ESP_LOGI(TAG, "exec task!!!");
-        // if (xQueueSend(traction_queue_handle, &traction_data, portMAX_DELAY) != pdPASS)
-        //{
-        //     ESP_LOGE(TAG, "Error sending data to queue");
-        // }
+        if (xQueueSend(traction_queue_handle, &traction_data, portMAX_DELAY) != pdPASS)
+        {
+            ESP_LOGE(TAG, "Error sending data to queue");
+        }
         vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
@@ -316,12 +316,17 @@ esp_err_t traction_control_soft_start(float target_speed, int tf)
     ESP_LOGI(TAG, "Starting soft start");
     // g_soft_start_traction_active = true;
     traction_control_set_direction(STARTING);
-    //motor_pair_add_speed_to_queue(target_speed, target_speed, traction_handle);
+    // motor_pair_add_speed_to_queue(target_speed, target_speed, traction_handle);
     g_soft_start_target_speed = target_speed;
     g_soft_start_tf = tf;
-    //ESP_ERROR_CHECK(traction_control_set_speed(target_speed, target_speed));
+    // ESP_ERROR_CHECK(traction_control_set_speed(target_speed, target_speed));
 
     return ESP_OK;
+}
+
+QueueHandle_t traction_control_get_queue_handle(void)
+{
+    return traction_queue_handle;
 }
 
 void traction_control_start_task(void)
