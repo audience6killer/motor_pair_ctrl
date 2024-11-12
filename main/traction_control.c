@@ -58,6 +58,7 @@ static void traction_pid_loop_cb(void *args)
     if (last_traction_state != g_traction_state)
     {
         last_traction_state = g_traction_state;
+        traction_data.state = g_traction_state;
 
         switch (g_traction_state)
         {
@@ -127,7 +128,6 @@ static void traction_pid_loop_cb(void *args)
         {
             g_soft_start_traction_active = false;
             traction_control_set_direction(FORWARD);
-            
         }
     }
     else
@@ -178,6 +178,7 @@ esp_err_t traction_control_set_direction(const motor_pair_state_e state)
 {
     // TODO: Some kind of verification might be necessary
     g_traction_state = state;
+    traction_data.state = state;
 
     return ESP_OK;
 }
@@ -296,7 +297,7 @@ static void traction_control_task(void *pvParameters)
     {
         #if SERIAL_DEBUG_ENABLE
         // printf()
-        printf("/*left_desired_speed,%f,speed_left,%f,right_des_speed,%f, speed_right,%f*/\r\n", traction_data.motor_left_desired_speed, traction_data.motor_left_real_pulses, traction_data.motor_right_desired_speed, traction_data.motor_right_real_pulses);
+        printf("/*left_desired_speed,%f,speed_left,%f,right_des_speed,%f, speed_right,%f,state,%d*/\r\n", traction_data.motor_left_desired_speed, traction_data.motor_left_real_pulses, traction_data.motor_right_desired_speed, traction_data.motor_right_real_pulses, traction_data.state);
         #endif
         // ESP_LOGI(TAG, "exec task!!!");
         // if (xQueueSend(traction_queue_handle, &traction_data, portMAX_DELAY) != pdPASS)
@@ -319,19 +320,6 @@ esp_err_t traction_control_soft_start(float target_speed, int tf)
     g_soft_start_target_speed = target_speed;
     g_soft_start_tf = tf;
     //ESP_ERROR_CHECK(traction_control_set_speed(target_speed, target_speed));
-
-    return ESP_OK;
-}
-
-esp_err_t traction_control_smooth_start(float target_speed)
-{
-    if (traction_handle == NULL)
-        return ESP_FAIL;
-
-    traction_control_set_direction(FORWARD);
-
-    ESP_LOGI(TAG, "Beginning smooth start");
-    ESP_ERROR_CHECK(motor_pair_smooth_start(traction_handle, target_speed));
 
     return ESP_OK;
 }

@@ -7,9 +7,10 @@
 
 static const char TAG[] = "test_traction_control";
 
+// Desired speed: 1.688rev/s @0.35m/s
 static void test_traction_control_task(void *pvParameters)
 {
-    const float target_speed = 1.688f;
+    const float target_speed = 0.850f;
     //const float target_speed = 1.000f;
     const int tf = 500;
     traction_control_soft_start(target_speed, tf);
