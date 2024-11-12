@@ -7,6 +7,7 @@
 #include "esp_timer.h"
 #include "esp_log.h"
 #include "stdbool.h"
+#include "string.h"
 
 #include "traction_control.h"
 #include "traction_task_common.h"
@@ -210,7 +211,10 @@ static void traction_control_task(void *pvParameters)
 {
     // Initialize traction_handle
     traction_handle = (motor_pair_handle_t *)malloc(sizeof(motor_pair_handle_t));
+    strcpy(traction_handle->id, "traction_control_pair"); 
 
+    // Configuration parameters
+    // TODO remove repeated pwm freq param
     motor_config_t traction_left_config = {
         .motor_encodera_gpio_num = TRACTION_MOTOR_LEFT_ENCODER_A,
         .motor_encoderb_gpio_num = TRACTION_MOTOR_LEFT_ENCODER_B,
@@ -252,7 +256,8 @@ static void traction_control_task(void *pvParameters)
         .motor_right_config = traction_right_config,
         .bdc_config = traction_bdc_conf,
     };
-
+    
+    // Init motor pair unit
     ESP_ERROR_CHECK(motor_pair_init(&traction_control_config, traction_handle));
 
     // Setting up timer
@@ -266,14 +271,17 @@ static void traction_control_task(void *pvParameters)
     esp_timer_handle_t traction_pid_loop_timer = NULL;
     ESP_ERROR_CHECK(esp_timer_create(&traction_timer_args, &traction_pid_loop_timer));
 
-    ESP_LOGI(TAG, "Enabling motor: %s", traction_handle->motor_left_ctx.motor_id);
-    ESP_ERROR_CHECK(bdc_motor_enable(traction_handle->motor_left_ctx.motor));
+    //ESP_LOGI(TAG, "Enabling motor: %s", traction_handle->motor_left_ctx.motor_id);
+    //ESP_ERROR_CHECK(bdc_motor_enable(traction_handle->motor_left_ctx.motor));
 
-    ESP_LOGI(TAG, "Enabling motor: %s", traction_handle->motor_right_ctx.motor_id);
-    ESP_ERROR_CHECK(bdc_motor_enable(traction_handle->motor_right_ctx.motor));
+    //ESP_LOGI(TAG, "Enabling motor: %s", traction_handle->motor_right_ctx.motor_id);
+    //ESP_ERROR_CHECK(bdc_motor_enable(traction_handle->motor_right_ctx.motor));
 
-    ESP_ERROR_CHECK(bdc_motor_brake(traction_handle->motor_left_ctx.motor));
-    ESP_ERROR_CHECK(bdc_motor_brake(traction_handle->motor_right_ctx.motor));
+    //ESP_ERROR_CHECK(bdc_motor_brake(traction_handle->motor_left_ctx.motor));
+    //ESP_ERROR_CHECK(bdc_motor_brake(traction_handle->motor_right_ctx.motor));
+
+    // Enable motors
+    ESP_ERROR_CHECK(motor_pair_enable_motors(traction_handle));
 
     ESP_LOGI(TAG, "Starting motor speed loop");
     ESP_ERROR_CHECK(esp_timer_start_periodic(traction_pid_loop_timer, traction_bdc_conf.pid_loop_period * 1000));

@@ -1,3 +1,13 @@
+/**
+ * @file traction_control.h
+ * @author your name (you@domain.com)
+ * @brief 
+ * @version 0.1
+ * @date 2024-11-12
+ * 
+ * @copyright Copyright (c) 2024
+ * 
+ */
 #ifndef TRACTION_CONTROL_H
 #define TRACTION_CONTROL_H
 
@@ -12,7 +22,7 @@
 esp_err_t traction_control_set_direction(const motor_pair_state_e state);
 
 /**
- * @brief 
+ * @brief The speed should be positive
  * 
  * @param motor_left_speed in rev/s 
  * @param motor_right_speed in rev/s
@@ -20,15 +30,16 @@ esp_err_t traction_control_set_direction(const motor_pair_state_e state);
  */
 esp_err_t traction_control_set_speed(float motor_left_speed, float motor_right_speed);
 
+// TODO
+// esp_err_t traction_control_speed_controlled_direction(float motor_left_speed, float motor_right_speed);
+
 /**
- * @brief 
+ * @brief Soft start for motors using a LSPB speed trajectory
  * 
- * @param target_speed 
+ * @param target_speed, in rev/s, will be applied to both wheels
+ * @param tf final time, in number of samples, each one at @10ms
  * @return esp_err_t 
  */
-esp_err_t traction_control_smooth_start(float target_speed);
-
-
 esp_err_t traction_control_soft_start(float target_speed, int tf);
 
 /**

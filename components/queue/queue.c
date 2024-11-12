@@ -56,7 +56,7 @@ int queue_size(queue_t *queue)
 int enqueue(queue_t *queue, float data) {
     if (is_queue_full(queue)) {
         printf("Queue is full");
-        return -1.0f;
+        return -1;
     }
 
     //printf("Added value to queue: %f\n", data);
@@ -64,7 +64,7 @@ int enqueue(queue_t *queue, float data) {
     queue->tail = (queue->tail + 1) % queue->capacity;
     queue->size++;
 
-    return 1.0f;
+    return 1;
 }
 
 float dequeue(queue_t *queue) {
@@ -105,6 +105,7 @@ void queue_print(queue_t *queue)
     }
   }
 }
+
 void destroy_queue(queue_t *queue) {
     free(queue->data);
     free(queue);

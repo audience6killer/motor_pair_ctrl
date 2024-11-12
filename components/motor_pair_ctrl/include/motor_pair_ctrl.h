@@ -1,3 +1,13 @@
+/**
+ * @file motor_pair_ctrl.h
+ * @author adrian pulido
+ * @brief
+ * @version 0.1
+ * @date 2024-11-12
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #ifndef MOTOR_PAIR_CTRL_H
 #define MOTOR_PAIR_CTRL_H
 
@@ -44,16 +54,6 @@ typedef struct
 
 typedef struct
 {
-    float motor_left_real_pulses;
-    float motor_right_real_pulses;
-    float motor_left_desired_speed;
-    float motor_right_desired_speed;
-    float motor_left_error;
-    float motor_right_error;
-} motor_pair_data_t;
-
-typedef struct
-{
     bdc_motor_handle_t motor;
     pcnt_unit_handle_t pcnt_encoder;
     pid_ctrl_block_handle_t pid_ctrl;
@@ -67,7 +67,7 @@ typedef struct
 {
     motor_control_context_t motor_left_ctx;
     motor_control_context_t motor_right_ctx;
-    char id[20];
+    char id[30];
 } motor_pair_handle_t;
 
 typedef enum
@@ -83,44 +83,53 @@ typedef enum
     TURN_RIGHT_REVERSE,
 } motor_pair_state_e;
 
+typedef struct
+{
+    float motor_left_real_pulses;
+    float motor_right_real_pulses;
+    float motor_left_desired_speed;
+    float motor_right_desired_speed;
+    float motor_left_error;
+    float motor_right_error;
+    motor_pair_state_e state;
+} motor_pair_data_t;
 
+/**
+ * @brief
+ *
+ * @param tf final time, in samples @10ms
+ * @param t current time
+ * @param qf final value in rev/s
+ * @param pvPoint
+ * @return esp_err_t
+ */
 esp_err_t calculate_lspb_speed_point(const int tf, int t, const float qf, float *pvPoint);
-
-/**
- * @brief Calculate LSPB curve points for smooth start. The start value will always be 0 
- * 
- * @param no_points Each point will be applied each pid period 
- * @param final_value rev/s
- * @param pvPoints 
- * @return esp_err_t 
- */
-esp_err_t calculate_lspb_speed_curve(const int tf, float qf, float accel, float *pvPoints);
-
-
-/**
- * @brief 
- * 
- * @return esp_err_t 
- */
-esp_err_t motor_pair_smooth_start(motor_pair_handle_t *pvMotor, float target_speed);
 
 /**
  * @brief Set motors desiered speed. Speed can be positive or negative.
  * @param motor_left_speed Speed must be in pulses
- * @param motor_right_speed 
- * @return esp_err_t 
+ * @param motor_right_speed
+ * @return esp_err_t
  */
 esp_err_t motor_pair_set_speed(int motor_left_speed, int motor_right_speed, motor_pair_handle_t *motor_pair);
 
 /**
- * @brief Speed have to be in rev/s 
- * 
- * @param motor_left_speed 
- * @param motor_right_speed 
- * @param motor_pair 
- * @return esp_err_t 
+ * @brief Speed have to be in rev/s
+ *
+ * @param motor_left_speed
+ * @param motor_right_speed
+ * @param motor_pair
+ * @return esp_err_t
  */
 esp_err_t motor_pair_add_speed_to_queue(float motor_left_speed, float motor_right_speed, motor_pair_handle_t *motor_pair);
+
+/**
+ * @brief Enable motor pair: bdc and pcnt units
+ *
+ * @param motor_pair
+ * @return esp_err_t
+ */
+esp_err_t motor_pair_enable_motors(motor_pair_handle_t *motor_pair);
 
 /**
  * @brief Initialize motor pair unit
@@ -129,7 +138,6 @@ esp_err_t motor_pair_add_speed_to_queue(float motor_left_speed, float motor_righ
  * @param pvHandle
  * @return esp_err_t
  */
-esp_err_t motor_pair_init(motor_pair_config_t *config,
-                          motor_pair_handle_t *pvHandle);
+esp_err_t motor_pair_init(motor_pair_config_t *config, motor_pair_handle_t *pvHandle);
 
 #endif
