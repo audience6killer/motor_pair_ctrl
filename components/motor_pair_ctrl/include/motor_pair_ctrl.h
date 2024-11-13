@@ -72,6 +72,7 @@ typedef struct
 
 typedef enum
 {
+    STOPPED,
     BRAKE, // Stop motor in a break way (Slow decay)
     COAST, // Stop motor in a coast way (aka Fast Decay)
     STARTING,

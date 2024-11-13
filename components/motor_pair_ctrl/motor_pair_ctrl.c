@@ -72,8 +72,9 @@ esp_err_t motor_pair_set_speed(int motor_left_speed, int motor_right_speed, moto
 
 esp_err_t motor_pair_add_speed_to_queue(float motor_left_speed, float motor_right_speed, motor_pair_handle_t *motor_pair)
 {
-    enqueue(motor_pair->motor_left_ctx.speed_queue, motor_left_speed);
-    enqueue(motor_pair->motor_right_ctx.speed_queue, motor_right_speed);
+    ESP_ERROR_CHECK(enqueue(motor_pair->motor_left_ctx.speed_queue, motor_left_speed));
+    
+    ESP_ERROR_CHECK(enqueue(motor_pair->motor_right_ctx.speed_queue, motor_right_speed));
 
     return ESP_OK;
 }
@@ -196,7 +197,7 @@ esp_err_t motor_pair_init_individual_motor(motor_config_t *motor_config, motor_p
 
 esp_err_t motor_pair_init(motor_pair_config_t *config, motor_pair_handle_t *pvHandle)
 {
-    ESP_LOGI(TAG, "Initializing motor pair");
+    ESP_LOGI(TAG, "Initializing motor pair %s", pvHandle->id);
 
     ESP_ERROR_CHECK(motor_pair_init_individual_motor(&config->motor_left_config, &config->bdc_config, &pvHandle->motor_left_ctx));
     ESP_ERROR_CHECK(motor_pair_init_individual_motor(&config->motor_right_config, &config->bdc_config, &pvHandle->motor_right_ctx));

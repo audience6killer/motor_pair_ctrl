@@ -1,6 +1,11 @@
 #include <stdlib.h>
 #include "stdio.h"
+#include "freertos/FreeRTOS.h"
+#include "esp_log.h"
+
 #include "queue.h"
+
+static const char TAG[] = "QUEUE";
 
 queue_t* create_queue(int capacity) {
     if (capacity > MAX_QUEUE_CAPACITY) {
@@ -24,27 +29,28 @@ queue_t* create_queue(int capacity) {
     return queue;
 }
 
-int empty_queue(queue_t* queue)
+esp_err_t empty_queue(queue_t* queue)
 {
     if(queue != NULL)
     {
+        float value;
         for (size_t i = 0; i < queue->size; i++)
         {
-            dequeue(queue);
+            dequeue(queue, &value);
         }
-        return 1;
+        return ESP_OK;
     }
     else
     {
-        return -1;
+        return ESP_FAIL;
     }
 }
 
-int is_queue_empty(queue_t *queue) {
+bool is_queue_empty(queue_t *queue) {
     return queue->size == 0;
 }
 
-int is_queue_full(queue_t *queue) {
+bool is_queue_full(queue_t *queue) {
     return queue->size == queue->capacity;
 }
 
@@ -53,10 +59,11 @@ int queue_size(queue_t *queue)
     return queue->size;
 }
 
-int enqueue(queue_t *queue, float data) {
+esp_err_t enqueue(queue_t *queue, float data) {
     if (is_queue_full(queue)) {
-        printf("Queue is full");
-        return -1;
+        ESP_LOGE(TAG, "Queue is full");
+        queue_print(queue);
+        return ESP_FAIL;
     }
 
     //printf("Added value to queue: %f\n", data);
@@ -64,35 +71,39 @@ int enqueue(queue_t *queue, float data) {
     queue->tail = (queue->tail + 1) % queue->capacity;
     queue->size++;
 
-    return 1;
+    return ESP_OK;
 }
 
-float dequeue(queue_t *queue) {
+esp_err_t dequeue(queue_t *queue, float *value) {
     if (is_queue_empty(queue)) {
-        return -1.0f;
+        ESP_LOGE(TAG, "Queue is empty");
+        return ESP_FAIL;
     }
 
-    float dequeued_value = queue->data[queue->head];
+    // float dequeued_value = queue->data[queue->head];
+    *(value) = queue->data[queue->head];
     queue->head = (queue->head + 1) % queue->capacity;
     queue->size--;
 
-    return dequeued_value;
+    return ESP_OK;
 }
 
-float front(queue_t *queue) {
+esp_err_t front(queue_t *queue, float *value) {
     if (is_queue_empty(queue)) {
-        return -1;
+        return ESP_FAIL;
     } else {
+        *(value) = queue->data[queue->head];
         return queue->data[queue->head];
     }
 }
 
-float back(queue_t *queue)
+esp_err_t back(queue_t *queue, float *value)
 {
     if (is_queue_empty(queue)) {
-        return -1;
+        return ESP_FAIL;
     } else {
-        return queue->data[queue->tail];
+        *(value) = queue->data[queue->tail];
+        return ESP_OK; 
     }
 }
 void queue_print(queue_t *queue)
@@ -106,7 +117,8 @@ void queue_print(queue_t *queue)
   }
 }
 
-void destroy_queue(queue_t *queue) {
+esp_err_t destroy_queue(queue_t *queue) {
     free(queue->data);
     free(queue);
+    return ESP_OK;
 }

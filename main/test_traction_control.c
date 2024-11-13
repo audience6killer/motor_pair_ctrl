@@ -14,17 +14,20 @@ static const char TAG[] = "test_traction_control";
 
 static motor_pair_data_t traction_data;
 
+//void test_speed_curve(int t, float *motor_left_speed, float *motor_right_speed)
+//{
+//}
+
 // Desired speed: 1.688rev/s @0.35m/s
 static void test_traction_control_task(void *pvParameters)
 {
-    const float target_speed = 0.850f;
-    //const float target_speed = 1.688f;
+    //const float target_speed = 0.850f;
+    const float target_speed = 1.688f;
     const int tf = 500;
     traction_control_soft_start(target_speed, tf);
-    
 
-    //traction_control_set_direction(REVERSE);
-    //traction_control_set_speed(target_speed, target_speed);
+    // traction_control_set_direction(REVERSE);
+    // traction_control_set_speed(target_speed, target_speed);
 
     QueueHandle_t traction_queue_handle = traction_control_get_queue_handle();
     for (;;)
@@ -36,16 +39,16 @@ static void test_traction_control_task(void *pvParameters)
             // printf()
             printf("/*left_desired_speed,%f,speed_left,%f,right_des_speed,%f,speed_right,%f,state,%d*/\r\n", traction_data.motor_left_desired_speed, traction_data.motor_left_real_pulses, traction_data.motor_right_desired_speed, traction_data.motor_right_real_pulses, traction_data.state);
 #endif
-            if(traction_data.state != STARTING)
+            if (traction_data.state != STARTING && traction_data.state != STOPPED)
             {
-                // Do test here for speed controlled direction
+                ESP_ERROR_CHECK(traction_control_speed_controlled_direction(-1.00f, -1.00f));
             }
         }
         else
         {
             ESP_LOGE(TAG, "Error receiving queue");
         }
-        vTaskDelay(pdMS_TO_TICKS(200));
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 

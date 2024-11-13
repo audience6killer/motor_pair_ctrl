@@ -10,6 +10,7 @@
  */
 #ifndef QUEUE_F_H
 #define QUEUE_F_H
+#include "stdbool.h"
 
 const static int MAX_QUEUE_CAPACITY = 1000;
 
@@ -27,23 +28,23 @@ typedef struct
  * @param queue 
  * @return int 
  */
-int empty_queue(queue_t* queue);
+esp_err_t empty_queue(queue_t* queue);
 
 /**
  * @brief Check whether the queue is empty or not
  * 
  * @param queue 
- * @return int, 1 is empty
+ * @return 
  */
-int is_queue_empty(queue_t* queue);
+bool is_queue_empty(queue_t* queue);
 
 /**
  * @brief Is queue full 
  * 
  * @param queue 
- * @return int 1 is full 
+ * @return 
  */
-int is_queue_full(queue_t* queue);
+bool is_queue_full(queue_t* queue);
 
 /**
  * @brief Queue current size 
@@ -60,7 +61,7 @@ int queue_size(queue_t* queue);
  * @param data 
  * @return int 1 success, -1 fail
  */
-int enqueue(queue_t *queue, float data); 
+esp_err_t enqueue(queue_t *queue, float data); 
 
 /**
  * @brief Dequeue last value and return it
@@ -68,7 +69,7 @@ int enqueue(queue_t *queue, float data);
  * @param queue 
  * @return float 
  */
-float dequeue(queue_t *queue);
+esp_err_t dequeue(queue_t *queue, float *value);
 
 /**
  * @brief Get front value, but not dequeue it
@@ -76,7 +77,7 @@ float dequeue(queue_t *queue);
  * @param queue 
  * @return float 
  */
-float front(queue_t *queue);
+esp_err_t front(queue_t *queue, float *value);
 
 /**
  * @brief Get last value, but not dequeue it
@@ -84,14 +85,14 @@ float front(queue_t *queue);
  * @param queue 
  * @return float 
  */
-float back(queue_t *queue);
+esp_err_t back(queue_t *queue, float *value);
 
 /**
  * @brief Release queue memory
  * 
  * @param queue 
  */
-void destroy_queue(queue_t *queue);
+esp_err_t destroy_queue(queue_t *queue);
 
 /**
  * @brief Print entire queue 

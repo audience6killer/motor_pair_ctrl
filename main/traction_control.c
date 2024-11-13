@@ -23,7 +23,7 @@ static const char TAG[] = "traction_control";
 
 static motor_pair_handle_t *traction_handle = NULL;
 static QueueHandle_t traction_queue_handle;
-static motor_pair_state_e g_traction_state = BRAKE;
+static motor_pair_state_e g_traction_state = STOPPED;
 static motor_pair_data_t traction_data;
 
 static bool g_soft_start_traction_active = false;
@@ -34,7 +34,7 @@ static void traction_pid_loop_cb(void *args)
 {
     static int motor_left_last_pulse_count = 0;
     static int motor_right_last_pulse_count = 0;
-    static motor_pair_state_e last_traction_state = BRAKE;
+    static motor_pair_state_e last_traction_state = STOPPED;
     static int soft_start_counter = 0;
 
     // Calculate current speed
@@ -46,6 +46,10 @@ static void traction_pid_loop_cb(void *args)
     // The sign of the speed doesn't matter, as the forward and reverse of the motor will control the direction
     int motor_left_real_pulses = abs(motor_left_cur_pulse_count - motor_left_last_pulse_count);
     int motor_right_real_pulses = abs(motor_right_cur_pulse_count - motor_right_last_pulse_count);
+
+    // Save the real value of the speed
+    traction_data.motor_left_real_pulses = (motor_left_cur_pulse_count - motor_left_last_pulse_count) * TRACTION_M_LEFT_PULSES2REV;
+    traction_data.motor_right_real_pulses = (motor_right_cur_pulse_count - motor_right_last_pulse_count) * TRACTION_M_RIGHT_PULSES2REV;
 
     motor_right_last_pulse_count = motor_right_cur_pulse_count;
     motor_left_last_pulse_count = motor_left_cur_pulse_count;
@@ -120,6 +124,7 @@ static void traction_pid_loop_cb(void *args)
         // During the soft start the queue will be ignored
         float point = 0.0f;
         // float target_speed = (float)traction_handle->motor_left_ctx.desired_speed / TRACTION_M_LEFT_REV2PULSES;
+
         calculate_lspb_speed_point(g_soft_start_tf, soft_start_counter, g_soft_start_target_speed, &point);
         traction_control_set_speed(point, point);
         // ESP_LOGI(TAG, "soft start point: %f", point);
@@ -135,7 +140,10 @@ static void traction_pid_loop_cb(void *args)
         // Check wheater there is another speed value in the queue
         if (!is_queue_empty(traction_handle->motor_left_ctx.speed_queue) && !is_queue_empty(traction_handle->motor_right_ctx.speed_queue))
         {
-            traction_control_set_speed(dequeue(traction_handle->motor_left_ctx.speed_queue), dequeue(traction_handle->motor_right_ctx.speed_queue));
+            float motor_right_speed, motor_left_speed;
+            ESP_ERROR_CHECK(dequeue(traction_handle->motor_left_ctx.speed_queue, &motor_left_speed));
+            ESP_ERROR_CHECK(dequeue(traction_handle->motor_right_ctx.speed_queue, &motor_right_speed));
+            traction_control_set_speed(motor_left_speed, motor_right_speed);
         }
     }
 
@@ -166,11 +174,17 @@ static void traction_pid_loop_cb(void *args)
     }
 
     // Save information
-    traction_data.motor_left_real_pulses = motor_left_real_pulses * TRACTION_M_LEFT_PULSES2REV;
-    traction_data.motor_right_real_pulses = motor_right_real_pulses * TRACTION_M_RIGHT_PULSES2REV;
-    traction_data.motor_left_desired_speed = traction_handle->motor_left_ctx.desired_speed * TRACTION_M_LEFT_PULSES2REV;
-    traction_data.motor_right_desired_speed = traction_handle->motor_right_ctx.desired_speed * TRACTION_M_RIGHT_PULSES2REV;
+    // traction_data.motor_left_real_pulses = motor_left_real_pulses * TRACTION_M_LEFT_PULSES2REV;
+    // traction_data.motor_right_real_pulses = motor_right_real_pulses * TRACTION_M_RIGHT_PULSES2REV;
+    if (g_traction_state == REVERSE || g_traction_state == TURN_LEFT_FORWARD || g_traction_state == TURN_RIGHT_REVERSE)
+        traction_data.motor_left_desired_speed = (-1.00f) * traction_handle->motor_left_ctx.desired_speed * TRACTION_M_LEFT_PULSES2REV;
+    else
+        traction_data.motor_left_desired_speed = traction_handle->motor_left_ctx.desired_speed * TRACTION_M_LEFT_PULSES2REV;
 
+    if (g_traction_state == REVERSE || g_traction_state == TURN_RIGHT_FORWARD || g_traction_state == TURN_LEFT_REVERSE)
+        traction_data.motor_right_desired_speed = (-1.00f) * traction_handle->motor_right_ctx.desired_speed * TRACTION_M_RIGHT_PULSES2REV;
+    else
+        traction_data.motor_right_desired_speed = traction_handle->motor_right_ctx.desired_speed * TRACTION_M_RIGHT_PULSES2REV;
     // ESP_LOGI(TAG, "/*left_desired_speed,%f,speed_left,%f,right_des_speed,%f, speed_right,%f*/\r\n", traction_data.motor_left_desired_speed, traction_data.motor_left_real_pulses, traction_data.motor_right_desired_speed, traction_data.motor_right_real_pulses);
 }
 
@@ -179,11 +193,9 @@ esp_err_t traction_control_set_direction(const motor_pair_state_e state)
     // TODO: Some kind of verification might be necessary
     g_traction_state = state;
     // TODO: This is here because I don't know how to initialize the value yet
-    traction_data.state = state;
-
+    // traction_data.state = state;
     return ESP_OK;
 }
-
 
 esp_err_t traction_control_set_speed(float motor_left_speed, float motor_right_speed)
 {
@@ -210,13 +222,13 @@ esp_err_t traction_control_speed_controlled_direction(float motor_left_speed, fl
 
     if (motor_left_abs <= TRACTION_M_LEFT_MAX_SPEED_REVS && motor_right_abs <= TRACTION_M_RIGHT_MAX_SPEED_REVS)
     {
-        if(motor_left_speed < 0.0f && motor_right_speed < 0.0f)
+        if (motor_left_speed < 0.0f && motor_right_speed < 0.0f)
             traction_control_set_direction(REVERSE);
-        else if(motor_left_speed < 0.0f && motor_right_speed >= 0.0f)
+        else if (motor_left_speed < 0.0f && motor_right_speed >= 0.0f)
             traction_control_set_direction(TURN_LEFT_FORWARD);
-        else if(motor_left_speed >= 0.0f && motor_right_speed < 0.0f)
+        else if (motor_left_speed >= 0.0f && motor_right_speed < 0.0f)
             traction_control_set_direction(TURN_RIGHT_FORWARD);
-        else if(motor_left_speed > 0.0f && motor_right_speed > 0.0f)
+        else if (motor_left_speed > 0.0f && motor_right_speed > 0.0f)
             traction_control_set_direction(FORWARD);
         else
             traction_control_set_direction(BRAKE);
@@ -309,6 +321,17 @@ static void traction_control_task(void *pvParameters)
     // Enable motors
     ESP_ERROR_CHECK(motor_pair_enable_motors(traction_handle));
 
+    // Intinialize traction_data
+    traction_data = (motor_pair_data_t){
+        .state = STOPPED,
+        .motor_left_desired_speed = 0.0f,
+        .motor_left_error = 0.0f,
+        .motor_left_real_pulses = 0.0f,
+        .motor_right_desired_speed = 0.0f,
+        .motor_right_error = 0.0f,
+        .motor_right_real_pulses = 0.0f,
+    };
+
     ESP_LOGI(TAG, "Starting motor speed loop");
     ESP_ERROR_CHECK(esp_timer_start_periodic(traction_pid_loop_timer, traction_bdc_conf.pid_loop_period * 1000));
 
@@ -320,11 +343,6 @@ static void traction_control_task(void *pvParameters)
 
     for (;;)
     {
-//#if SERIAL_DEBUG_ENABLE
-//        // printf()
-//        printf("/*left_desired_speed,%f,speed_left,%f,right_des_speed,%f, speed_right,%f,state,%d*/\r\n", traction_data.motor_left_desired_speed, traction_data.motor_left_real_pulses, traction_data.motor_right_desired_speed, traction_data.motor_right_real_pulses, traction_data.state);
-//#endif
-        // ESP_LOGI(TAG, "exec task!!!");
         if (xQueueSend(traction_queue_handle, &traction_data, portMAX_DELAY) != pdPASS)
         {
             ESP_LOGE(TAG, "Error sending data to queue");
@@ -341,10 +359,8 @@ esp_err_t traction_control_soft_start(float target_speed, int tf)
     ESP_LOGI(TAG, "Starting soft start");
     // g_soft_start_traction_active = true;
     traction_control_set_direction(STARTING);
-    // motor_pair_add_speed_to_queue(target_speed, target_speed, traction_handle);
     g_soft_start_target_speed = target_speed;
     g_soft_start_tf = tf;
-    // ESP_ERROR_CHECK(traction_control_set_speed(target_speed, target_speed));
 
     return ESP_OK;
 }
