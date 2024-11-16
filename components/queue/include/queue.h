@@ -10,6 +10,7 @@
  */
 #ifndef QUEUE_F_H
 #define QUEUE_F_H
+#include "freertos/FreeRTOS.h"
 #include "stdbool.h"
 
 const static int MAX_QUEUE_CAPACITY = 1000;
