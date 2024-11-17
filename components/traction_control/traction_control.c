@@ -54,11 +54,9 @@ static void traction_pid_loop_cb(void *args)
     motor_right_last_pulse_count = motor_right_cur_pulse_count;
     motor_left_last_pulse_count = motor_left_cur_pulse_count;
 
-    // TODO: Remove report_pulses
-    traction_handle->motor_right_ctx.report_pulses = motor_right_real_pulses;
-    traction_handle->motor_left_ctx.report_pulses = motor_left_real_pulses;
 
     // Check whether the state has changed
+    // TODO Add Stopped state action
     if (last_traction_state != g_traction_state)
     {
         last_traction_state = g_traction_state;
@@ -129,7 +127,7 @@ static void traction_pid_loop_cb(void *args)
         traction_control_set_speed(point, point);
         // ESP_LOGI(TAG, "soft start point: %f", point);
         soft_start_counter++;
-        if (soft_start_counter == SOFT_START_TF)
+        if (soft_start_counter == g_soft_start_tf)
         {
             g_soft_start_traction_active = false;
             traction_control_set_direction(FORWARD);
@@ -185,15 +183,12 @@ static void traction_pid_loop_cb(void *args)
         traction_data.motor_right_desired_speed = (-1.00f) * traction_handle->motor_right_ctx.desired_speed * TRACTION_M_RIGHT_PULSES2REV;
     else
         traction_data.motor_right_desired_speed = traction_handle->motor_right_ctx.desired_speed * TRACTION_M_RIGHT_PULSES2REV;
-    // ESP_LOGI(TAG, "/*left_desired_speed,%f,speed_left,%f,right_des_speed,%f, speed_right,%f*/\r\n", traction_data.motor_left_desired_speed, traction_data.motor_left_real_pulses, traction_data.motor_right_desired_speed, traction_data.motor_right_real_pulses);
 }
 
 esp_err_t traction_control_set_direction(const motor_pair_state_e state)
 {
     // TODO: Some kind of verification might be necessary
     g_traction_state = state;
-    // TODO: This is here because I don't know how to initialize the value yet
-    // traction_data.state = state;
     return ESP_OK;
 }
 
@@ -309,14 +304,6 @@ static void traction_control_task(void *pvParameters)
     esp_timer_handle_t traction_pid_loop_timer = NULL;
     ESP_ERROR_CHECK(esp_timer_create(&traction_timer_args, &traction_pid_loop_timer));
 
-    // ESP_LOGI(TAG, "Enabling motor: %s", traction_handle->motor_left_ctx.motor_id);
-    // ESP_ERROR_CHECK(bdc_motor_enable(traction_handle->motor_left_ctx.motor));
-
-    // ESP_LOGI(TAG, "Enabling motor: %s", traction_handle->motor_right_ctx.motor_id);
-    // ESP_ERROR_CHECK(bdc_motor_enable(traction_handle->motor_right_ctx.motor));
-
-    // ESP_ERROR_CHECK(bdc_motor_brake(traction_handle->motor_left_ctx.motor));
-    // ESP_ERROR_CHECK(bdc_motor_brake(traction_handle->motor_right_ctx.motor));
 
     // Enable motors
     ESP_ERROR_CHECK(motor_pair_enable_motors(traction_handle));
