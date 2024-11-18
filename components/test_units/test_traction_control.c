@@ -37,7 +37,7 @@ static void test_traction_control_task(void *pvParameters)
         {
 #if SERIAL_DEBUG_ENABLE
             // printf()
-            printf("/*left_desired_speed,%f,speed_left,%f,right_des_speed,%f,speed_right,%f,state,%d*/\r\n", traction_data.motor_left_desired_speed, traction_data.motor_left_real_pulses, traction_data.motor_right_desired_speed, traction_data.motor_right_real_pulses, traction_data.state);
+            printf("/*left_desired_speed,%f,speed_left,%f,right_des_speed,%f,speed_right,%f,state,%d*/\r\n", traction_data.motor_left_desired_speed, traction_data.motor_left_current_speed, traction_data.motor_right_desired_speed, traction_data.motor_right_current_speed, traction_data.state);
 #endif
             if (traction_data.state != STARTING && traction_data.state != STOPPED)
             {

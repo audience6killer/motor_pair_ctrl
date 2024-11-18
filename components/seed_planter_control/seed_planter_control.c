@@ -41,12 +41,15 @@ static void seed_planter_pid_loop_cb(void *args)
     pcnt_unit_get_count(seed_dispenser->pcnt_encoder, &seed_dispenser_cur_pulse_count);
 
     // The sign of the speed doesn't matter, as the forward and reverse of the motor will control the direction of the spin
-    int cutter_disc_real_pulses = abs(cutter_disc_cur_pulse_count - cutter_disc_last_pulse_count);
-    int seed_dispenser_real_pulses = abs(seed_dispenser_cur_pulse_count - seed_dispenser_last_pulse_count);
+    int cutter_disc_real_pulses = cutter_disc_cur_pulse_count - cutter_disc_last_pulse_count;
+    int seed_dispenser_real_pulses = seed_dispenser_cur_pulse_count - seed_dispenser_last_pulse_count;
+
+    int cutter_disc_abs_pulses = abs(cutter_disc_real_pulses);
+    int seed_dispenser_abs_pulses = abs(seed_dispenser_real_pulses);
 
     // Save real pulse count
-    seed_planter_data.motor_left_real_pulses = ( cutter_disc_cur_pulse_count - cutter_disc_last_pulse_count ) * CUTTER_DISC_PULSES2REV;
-    seed_planter_data.motor_right_real_pulses = ( seed_dispenser_cur_pulse_count - seed_dispenser_last_pulse_count ) * SEED_DISPENSER_PULSES2REV;
+    seed_planter_data.motor_left_current_speed = (cutter_disc_real_pulses) * CUTTER_DISC_PULSES2REV;
+    seed_planter_data.motor_right_current_speed = (seed_dispenser_real_pulses) * SEED_DISPENSER_PULSES2REV;
 
     seed_dispenser_last_pulse_count = seed_dispenser_cur_pulse_count;
     cutter_disc_last_pulse_count = cutter_disc_cur_pulse_count;
@@ -125,8 +128,8 @@ static void seed_planter_pid_loop_cb(void *args)
     if (last_seed_planter_state != SP_BRAKE && last_seed_planter_state != SP_STOPPED)
     {
         // Calculate speed error
-        float cutter_disc_error = cutter_disc->desired_speed - cutter_disc_real_pulses;
-        float seed_dispenser_error = seed_dispenser->desired_speed - seed_dispenser_real_pulses;
+        float cutter_disc_error = cutter_disc->desired_speed - cutter_disc_abs_pulses;
+        float seed_dispenser_error = seed_dispenser->desired_speed - seed_dispenser_abs_pulses;
 
         // Calculate the new speed
         float seed_dispenser_new_speed = 0.0f;
@@ -135,15 +138,7 @@ static void seed_planter_pid_loop_cb(void *args)
         pid_compute(seed_dispenser->pid_ctrl, seed_dispenser_error, &seed_dispenser_new_speed);
         ESP_ERROR_CHECK(bdc_motor_set_speed(cutter_disc->motor, (uint32_t)cutter_disc_new_speed));
         ESP_ERROR_CHECK(bdc_motor_set_speed(seed_dispenser->motor, (uint32_t)seed_dispenser_new_speed));
-
-        seed_planter_data.motor_left_error = cutter_disc_error;
-        seed_planter_data.motor_right_error = seed_dispenser_error;
     }
-    else
-    {
-        seed_planter_data.motor_left_error = 0.0f;
-        seed_planter_data.motor_right_error = 0.0f;
-    } 
 
     // Save information: cutter - left
     if (g_seed_planter_current_state == SP_REVERSE)
@@ -251,11 +246,9 @@ static void seed_planter_control_task(void *pvParameters)
     seed_planter_data = (motor_pair_data_t){
         .state = STOPPED,
         .motor_left_desired_speed = 0.0f,
-        .motor_left_error = 0.0f,
-        .motor_left_real_pulses = 0.0f,
+        .motor_left_current_speed = 0.0f,
         .motor_right_desired_speed = 0.0f,
-        .motor_right_error = 0.0f,
-        .motor_right_real_pulses = 0.0f,
+        .motor_right_current_speed = 0.0f,
     };
 
     ESP_LOGI(TAG, "Starting seed planter motor speed loop");

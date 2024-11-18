@@ -86,12 +86,12 @@ typedef enum
 
 typedef struct
 {
-    float motor_left_real_pulses;
-    float motor_right_real_pulses;
+    float motor_left_current_speed; // In rev/s
+    float motor_right_current_speed;
     float motor_left_desired_speed;
     float motor_right_desired_speed;
-    float motor_left_error;
-    float motor_right_error;
+    float motor_left_angle_measured; // In rad
+    float motor_right_angle_measured;
     motor_pair_state_e state;
 } motor_pair_data_t;
 
