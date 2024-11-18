@@ -57,6 +57,8 @@ static void traction_pid_loop_cb(void *args)
     traction_data.motor_left_angle_measured = motor_left_real_pulses * TRACTION_M_LEFT_PULSES2RAD;
     traction_data.motor_right_angle_measured = motor_right_real_pulses * TRACTION_M_RIGHT_PULSES2RAD;
 
+    //printf("left_angle: %f, right_angle: %f\n", traction_data.motor_left_angle_measured, traction_data.motor_right_angle_measured);
+
     motor_right_last_pulse_count = motor_right_cur_pulse_count;
     motor_left_last_pulse_count = motor_left_cur_pulse_count;
 

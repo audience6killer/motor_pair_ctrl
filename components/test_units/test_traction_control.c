@@ -35,14 +35,14 @@ static void test_traction_control_task(void *pvParameters)
 
         if (xQueueReceive(traction_queue_handle, &traction_data, portMAX_DELAY) == pdPASS)
         {
-#if SERIAL_DEBUG_ENABLE
+#if false 
             // printf()
             printf("/*left_desired_speed,%f,speed_left,%f,right_des_speed,%f,speed_right,%f,state,%d*/\r\n", traction_data.motor_left_desired_speed, traction_data.motor_left_current_speed, traction_data.motor_right_desired_speed, traction_data.motor_right_current_speed, traction_data.state);
 #endif
-            if (traction_data.state != STARTING && traction_data.state != STOPPED)
-            {
-                ESP_ERROR_CHECK(traction_control_speed_controlled_direction(-1.00f, -1.00f));
-            }
+            //if (traction_data.state != STARTING && traction_data.state != STOPPED)
+            //{
+            //    ESP_ERROR_CHECK(traction_control_speed_controlled_direction(-1.00f, -1.00f));
+            //}
         }
         else
         {

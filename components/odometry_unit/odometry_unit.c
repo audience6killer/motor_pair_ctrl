@@ -24,6 +24,8 @@ esp_err_t odometry_calculate_pose(motor_pair_data_t r_data)
     float delta_phi_l = r_data.motor_left_angle_measured;
     float delta_phi_r = r_data.motor_right_angle_measured;
 
+    //printf("delta_phi_l: %f, delta_phi_r: %f \n", delta_phi_l, delta_phi_r);
+
     g_vehicle_pose.phi_l += delta_phi_l;
     g_vehicle_pose.phi_r += delta_phi_r;
 
@@ -54,8 +56,8 @@ static void odometry_unit_task(void *pvParameters)
         if(xQueueReceive(traction_control_queue, &traction_data, portMAX_DELAY) == pdPASS)
         {
             ESP_ERROR_CHECK(odometry_calculate_pose(traction_data));
-            #if SERIAL_DEBUG_ENABLE
-            printf("/*x,%f,y,%f,theta,%f*/\r\n", g_vehicle_pose.x, g_vehicle_pose.y, g_vehicle_pose.theta);
+            #if true 
+            printf("/*x,%f,y,%f,theta,%f,left_desired_speed,%f,speed_left,%f,right_des_speed,%f,speed_right,%f,state,%d*/\r\n", g_vehicle_pose.x, g_vehicle_pose.y, g_vehicle_pose.theta, traction_data.motor_left_desired_speed, traction_data.motor_left_current_speed, traction_data.motor_right_desired_speed, traction_data.motor_right_current_speed, traction_data.state);
             #endif 
         }
         else

@@ -11,7 +11,10 @@ typedef struct odometry_robot_pose
     float theta; // In degrees
 } odometry_robot_pose_t;
 
-
+/**
+ * @brief Odometry start task 
+ * 
+ */
 void odometry_unit_start_task(void);
 
 #endif
