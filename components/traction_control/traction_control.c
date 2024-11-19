@@ -167,6 +167,8 @@ static void traction_pid_loop_cb(void *args)
         pid_compute(traction_handle->motor_right_ctx.pid_ctrl, motor_right_error, &motor_right_new_speed);
         pid_compute(traction_handle->motor_left_ctx.pid_ctrl, motor_left_error, &motor_left_new_speed);
 
+        //printf("motor_left_error: %f, new_speed_left: %f\n", motor_left_error, motor_left_new_speed);
+
         ESP_ERROR_CHECK(bdc_motor_set_speed(traction_handle->motor_right_ctx.motor, (uint32_t)motor_right_new_speed));
         ESP_ERROR_CHECK(bdc_motor_set_speed(traction_handle->motor_left_ctx.motor, (uint32_t)motor_left_new_speed));
     }
@@ -203,8 +205,8 @@ esp_err_t traction_control_set_speed(float motor_left_speed, float motor_right_s
 {
     if (motor_left_speed <= TRACTION_M_LEFT_MAX_SPEED_REVS && motor_right_speed <= TRACTION_M_RIGHT_MAX_SPEED_REVS)
     {
-        int pulses_left_speed = (int)(motor_left_speed * TRACTION_M_LEFT_REV2PULSES);
-        int pulses_right_speed = (int)(motor_right_speed * TRACTION_M_RIGHT_REV2PULSES);
+        int pulses_left_speed = (int)floorf(motor_left_speed * TRACTION_M_LEFT_REV2PULSES);
+        int pulses_right_speed = (int)floorf(motor_right_speed * TRACTION_M_RIGHT_REV2PULSES);
         ESP_ERROR_CHECK(motor_pair_set_speed(pulses_left_speed, pulses_right_speed, traction_handle));
         // ESP_LOGI(TAG, "Speed set left: %f, Speed set right: %f", motor_left_speed, motor_right_speed);
     }

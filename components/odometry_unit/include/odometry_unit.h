@@ -12,6 +12,13 @@ typedef struct odometry_robot_pose
 } odometry_robot_pose_t;
 
 /**
+ * @brief 
+ * 
+ * @return QueueHandle_t 
+ */
+QueueHandle_t odometry_unit_get_queue_handle(void);
+
+/**
  * @brief Odometry start task 
  * 
  */

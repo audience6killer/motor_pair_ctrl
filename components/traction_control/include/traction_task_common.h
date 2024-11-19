@@ -32,9 +32,14 @@
 #define MOTOR1_ENCODER_RES                  908
 #define MOTOR2_ENCODER_RES                  908
 
-#define TRACTION_MOTOR_LEFT_KP              0.6
+// TODO fix pid gains
+//#define TRACTION_MOTOR_LEFT_KP              -0.3530
+//#define TRACTION_MOTOR_LEFT_KI              3.7307E-06
+//#define TRACTION_MOTOR_LEFT_KD              42.8752
+
+#define TRACTION_MOTOR_LEFT_KP              0.6 // 6.4
 #define TRACTION_MOTOR_LEFT_KI              0.4
-#define TRACTION_MOTOR_LEFT_KD              0.2
+#define TRACTION_MOTOR_LEFT_KD              0.2 
 
 #define TRACTION_MOTOR_RIGHT_KP             0.6
 #define TRACTION_MOTOR_RIGHT_KI             0.4
@@ -46,6 +51,7 @@
 #define TRACTION_M_RIGHT_MAX_SPEED_REVS     1.854f
 #define TRACTION_M_LEFT_MAX_SPEED_REVS      5.876f
 
+// Fix loosy conversions 
 #define TRACTION_M_RIGHT_REV2PULSES         20 / 1.03
 #define TRACTION_M_LEFT_REV2PULSES          10 / 1.13
 #define TRACTION_M_RIGHT_PULSES2REV         0.0515f
