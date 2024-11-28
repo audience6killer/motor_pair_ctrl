@@ -25,26 +25,24 @@ static void test_traction_control_task(void *pvParameters)
     //traction_control_set_speed(target_speed, target_speed);
     //traction_control_speed_controlled_direction(target_speed, target_speed);
 
-    QueueHandle_t traction_queue_handle = traction_control_get_queue_handle();
+    //QueueHandle_t traction_queue_handle = traction_control_get_queue_handle();
     for (;;)
     {
 
-        if (xQueueReceive(traction_queue_handle, &traction_data, portMAX_DELAY) == pdPASS)
-        {
-#if true
-            // printf()
-            printf("/*left_setpoint,%d,speed_left,%d,right_setpoint,%d,speed_right,%d,state,%d*/\r\n", traction_data.mleft_set_point, traction_data.mleft_real_pulses, traction_data.mright_real_pulses, traction_data.mright_real_pulses, traction_data.state);
-#endif
-            if (traction_data.state != STARTING && traction_data.state != STOPPED)
-            {
-                //ESP_ERROR_CHECK(traction_control_speed_controlled_direction(-1.00f, -1.00f));
-            }
-        }
-        else
-        {
-            ESP_LOGE(TAG, "Error receiving queue");
-        }
-        vTaskDelay(pdMS_TO_TICKS(10));
+        //if (xQueueReceive(traction_queue_handle, &traction_data, portMAX_DELAY) == pdPASS)
+        //{
+        //    // printf()
+        //    printf("/*left_setpoint,%d,speed_left,%d,right_setpoint,%d,speed_right,%d,state,%d*/\r\n", traction_data.mleft_set_point, traction_data.mleft_real_pulses, traction_data.mright_real_pulses, traction_data.mright_real_pulses, traction_data.state);
+        //    if (traction_data.state != STARTING && traction_data.state != STOPPED)
+        //    {
+        //        //ESP_ERROR_CHECK(traction_control_speed_controlled_direction(-1.00f, -1.00f));
+        //    }
+        //}
+        //else
+        //{
+        //    ESP_LOGE(TAG, "Error receiving queue");
+        //}
+        vTaskDelay(pdMS_TO_TICKS(30));
     }
 }
 

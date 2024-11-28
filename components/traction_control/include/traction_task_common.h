@@ -5,7 +5,7 @@
 // Right motor connected to Driver's OUT2
 
 #define TRACTION_CONTROL_STACK_SIZE         4096
-#define TRACTION_CONTROL_TASK_PRIORITY      2 
+#define TRACTION_CONTROL_TASK_PRIORITY      12 
 #define TRACTION_CONTROL_CORE_ID            0
 
 #define BDC_MCPWM_TIMER_RESOLUTION_HZ       10000000 // 10MHz, 1 tick = 0.1us
@@ -45,8 +45,8 @@
 //#define TRACTION_MOTOR_RIGHT_KI             0.4
 //#define TRACTION_MOTOR_RIGHT_KD             0.2
 
-#define MOTOR_LEFT_MAX_SPEED                54.0f
-#define MOTOR_RIGHT_MAX_SPEED               39.0f
+#define TRACTION_ML_MAX_PULSES              54
+#define TRACTION_MR_MAX_PULSES              39
 
 #define TRACTION_M_LEFT_MAX_SPEED_REVS      6.0f
 #define TRACTION_M_RIGHT_MAX_SPEED_REVS     2.0f
