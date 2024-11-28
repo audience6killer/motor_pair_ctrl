@@ -14,18 +14,18 @@
 #include "pid_ctrl.h"
 
 #ifndef MIN
-#define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
+#define MIN(X, Y) ((X) < (Y) ? (X) : (Y))
 #endif
 
 #ifndef MAX
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #endif
 
-#define X_D 2.00f
-#define Y_D 2.00f
+#define X_D 10.00f
+#define Y_D 0.00f
 #define THETA_D 0.00f
-#define V_COMM 0.70f
-#define V_MAX   1.688f
+#define V_COMM 1.00f
+#define V_MAX 2.00f
 #define WHEEL_RADIUS 0.033f
 #define DISTANCE_TH 0.05f // 5 cm
 #define ORIENTATION_TH 0.174533f
@@ -50,22 +50,26 @@ esp_err_t navigation_orientation_control(float theta_error)
     return ESP_OK;
 }
 
-esp_err_t navigation_position_control(float x_error, float y_error, float theta_error)
+esp_err_t navigation_position_control(float theta_error)
 {
     ESP_RETURN_ON_FALSE(navigation_handle != NULL, ESP_ERR_INVALID_STATE, "TAG", "navigation_handle is null when calculating pos control");
 
     float omega_comm = 0.0f;
 
-    ESP_ERROR_CHECK(pid_compute(navigation_handle->orientation_pid_ctrl, theta_error, &omega_comm));
+    ESP_ERROR_CHECK(pid_compute(navigation_handle->position_pid_ctrl, theta_error, &omega_comm));
 
-    float phi_lp = RADS2REVS( (V_COMM - omega_comm) / WHEEL_RADIUS );
-    float phi_rp = RADS2REVS( (V_COMM + omega_comm) / WHEEL_RADIUS );
-    
-    phi_lp = MIN( MAX(phi_lp, -V_MAX), V_MAX );
-    phi_rp = MIN( MAX(phi_rp, -V_MAX), V_MAX );
+    // ERROR HERE!
+    float phi_lp = V_COMM - (omega_comm / WHEEL_RADIUS);
+    float phi_rp = V_COMM + (omega_comm / WHEEL_RADIUS);
+
+    //phi_lp = RADS2REVS(phi_lp);
+    //phi_rp = RADS2REVS(phi_rp);
+
+    phi_lp = MIN(MAX(phi_lp, -V_MAX), V_MAX);
+    phi_rp = MIN(MAX(phi_rp, -V_MAX), V_MAX);
 
     printf("omega_comm,%f,", omega_comm);
-    //printf("phi_lp: %f, phi_rp: %f\t", phi_lp, phi_rp);
+    // printf("phi_lp: %f, phi_rp: %f\t", phi_lp, phi_rp);
 
     ESP_ERROR_CHECK(traction_control_speed_controlled_direction(phi_lp, phi_rp));
 
@@ -82,14 +86,13 @@ esp_err_t navigation_position_follower(odometry_robot_pose_t *c_pose)
 
     float dist_error = sqrtf(powf(x_error, 2) + powf(y_error, 2));
 
-
-    if (fabs(dist_error) >= DISTANCE_TH)
+    if (dist_error > DISTANCE_TH)
     {
-        ESP_ERROR_CHECK(navigation_position_control(x_error, y_error, theta_error));
+        ESP_ERROR_CHECK(navigation_position_control(theta_error));
         printf("distance,%f,theta_error,%f,", dist_error, theta_error);
     }
-    //else if (fabs(theta_error) >= ORIENTATION_TH)
-        //ESP_ERROR_CHECK(navigation_orientation_control(theta_error));
+    // else if (fabs(theta_error) >= ORIENTATION_TH)
+    // ESP_ERROR_CHECK(navigation_orientation_control(theta_error));
     else
     {
         ESP_LOGI(TAG, "Vehicle reached point: (%f, %f, theta:%f)\n", X_D, Y_D, THETA_D);
@@ -108,7 +111,7 @@ esp_err_t navigation_unit_init(void)
         .kp = NAVIGATION_UNIT_POS_KP,
         .kd = NAVIGATION_UNIT_POS_KD,
         .ki = 0.0,
-        .cal_type = PID_CAL_TYPE_POSITIONAL,
+        .cal_type = PID_CAL_TYPE_INCREMENTAL,
         .max_integral = 10,
         .min_integral = -10,
         .min_output = -200,
@@ -155,8 +158,8 @@ static void navigation_unit_task(void *pvParameters)
 
     // Start up traction soft start
     // const float target_speed = V_COMM;
-    const int tf = 200;
-    //traction_control_soft_start(V_COMM, tf);
+    const int tf = 100;
+    traction_control_soft_start(V_COMM, tf);
 
     odometry_robot_pose_t vehicle_pose;
 
