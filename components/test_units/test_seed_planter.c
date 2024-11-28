@@ -29,7 +29,7 @@ static void test_seed_planter_task(void *pvParameters)
 
 #if SERIAL_DEBUG_ENABLE
             // printf()
-            printf("/*cutter_desired_speed,%f,speed_cutter,%f,dispenser_desired_speed,%f,speed_dispenser,%f,state,%d*/\r\n", seed_planter_data.motor_left_desired_speed, seed_planter_data.motor_left_current_speed, seed_planter_data.motor_right_desired_speed, seed_planter_data.motor_right_current_speed, seed_planter_data.state);
+            printf("/*cutter_setpoint,%d,speed_cutter,%d,dispenser_setpoint,%d,speed_dispenser,%d,state,%d*/\r\n", seed_planter_data.mleft_set_point, seed_planter_data.mleft_real_pulses, seed_planter_data.mright_set_point, seed_planter_data.mright_real_pulses, seed_planter_data.state);
 #endif
         }
         else

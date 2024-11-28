@@ -48,8 +48,8 @@ static void seed_planter_pid_loop_cb(void *args)
     int seed_dispenser_abs_pulses = abs(seed_dispenser_real_pulses);
 
     // Save real pulse count
-    seed_planter_data.motor_left_current_speed = (cutter_disc_real_pulses) * CUTTER_DISC_PULSES2REV;
-    seed_planter_data.motor_right_current_speed = (seed_dispenser_real_pulses) * SEED_DISPENSER_PULSES2REV;
+    seed_planter_data.mleft_real_pulses = (cutter_disc_real_pulses) * CUTTER_DISC_PULSES2REV;
+    seed_planter_data.mright_real_pulses = (seed_dispenser_real_pulses) * SEED_DISPENSER_PULSES2REV;
 
     seed_dispenser_last_pulse_count = seed_dispenser_cur_pulse_count;
     cutter_disc_last_pulse_count = cutter_disc_cur_pulse_count;
@@ -143,13 +143,13 @@ static void seed_planter_pid_loop_cb(void *args)
     // Save information: cutter - left
     if (g_seed_planter_current_state == SP_REVERSE)
     {
-        seed_planter_data.motor_left_desired_speed = (-1.00f) * seed_planter_handle->motor_left_ctx.desired_speed * CUTTER_DISC_PULSES2REV;
-        seed_planter_data.motor_right_desired_speed = (-1.00f) * seed_planter_handle->motor_right_ctx.desired_speed * SEED_DISPENSER_PULSES2REV;
+        seed_planter_data.mleft_set_point= (-1.00f) * seed_planter_handle->motor_left_ctx.desired_speed * CUTTER_DISC_PULSES2REV;
+        seed_planter_data.mright_set_point = (-1.00f) * seed_planter_handle->motor_right_ctx.desired_speed * SEED_DISPENSER_PULSES2REV;
     }
     else 
     {
-        seed_planter_data.motor_left_desired_speed = seed_planter_handle->motor_left_ctx.desired_speed * CUTTER_DISC_PULSES2REV;
-        seed_planter_data.motor_right_desired_speed = seed_planter_handle->motor_right_ctx.desired_speed * SEED_DISPENSER_PULSES2REV;
+        seed_planter_data.mleft_set_point = seed_planter_handle->motor_left_ctx.desired_speed * CUTTER_DISC_PULSES2REV;
+        seed_planter_data.mright_set_point = seed_planter_handle->motor_right_ctx.desired_speed * SEED_DISPENSER_PULSES2REV;
     }
     
 }
@@ -216,7 +216,6 @@ static void seed_planter_control_task(void *pvParameters)
         .bdc_encoder_pcnt_high_limit = SEED_PLANTER_BDC_ENCODER_PCNT_HIGH_LIMIT,
         .bdc_encoder_pcnt_low_limit = SEED_PLANTER_BDC_ENCODER_PCNT_LOW_LIMIT,
         .mcpwm_group = SEED_PLANTER_MCPWM_GROUP,
-        .pwm_freq_hz = SEED_PLANTER_MOTORS_PWM_FREQ,
         .pid_loop_period = SEED_PLANTER_PID_LOOP_PERIDO_MS,
         .bdc_mcpwm_timer_resolution_hz = SEED_PLANTER_MCPWM_TIMER_RESOLUTION_HZ,
     };
@@ -245,10 +244,10 @@ static void seed_planter_control_task(void *pvParameters)
     // Initialize seed_planter_data
     seed_planter_data = (motor_pair_data_t){
         .state = STOPPED,
-        .motor_left_desired_speed = 0.0f,
-        .motor_left_current_speed = 0.0f,
-        .motor_right_desired_speed = 0.0f,
-        .motor_right_current_speed = 0.0f,
+        .mleft_real_pulses = 0,
+        .mright_real_pulses = 0,
+        .mleft_set_point = 0,
+        .mright_set_point = 0,
     };
 
     ESP_LOGI(TAG, "Starting seed planter motor speed loop");

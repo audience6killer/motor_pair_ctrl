@@ -37,7 +37,6 @@ typedef struct
 
 typedef struct
 {
-    uint32_t pwm_freq_hz; /*PWM frequency for both motors */
     uint32_t bdc_mcpwm_timer_resolution_hz;
     uint8_t mcpwm_group;
     uint32_t bdc_encoder_pcnt_high_limit;
@@ -86,12 +85,10 @@ typedef enum
 
 typedef struct
 {
-    float motor_left_current_speed; // In rev/s
-    float motor_right_current_speed;
-    float motor_left_desired_speed;
-    float motor_right_desired_speed;
-    float motor_left_angle_measured; // In rad
-    float motor_right_angle_measured;
+    int mleft_real_pulses; // In pulses
+    int mright_real_pulses;
+    int mleft_set_point;
+    int mright_set_point;
     motor_pair_state_e state;
 } motor_pair_data_t;
 

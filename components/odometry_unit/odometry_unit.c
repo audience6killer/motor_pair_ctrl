@@ -16,10 +16,25 @@ static QueueHandle_t odometry_queue_handle;
 static odometry_robot_pose_t g_vehicle_pose;
 static odometry_robot_pose_t g_vehicle_pose_past;
 
+/**
+ * @brief Re-maps a number from one range to another. That is, a value of fromLow would get mapped to toLow, a value of fromHigh to toHigh, values in-between to values in-between, etc.
+ * 
+ * @param x 
+ * @param in_min 
+ * @param in_max 
+ * @param out_min 
+ * @param out_max 
+ * @return int 
+ */
+int map(int x, int in_min, int in_max, int out_min, int out_max) 
+{
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
 esp_err_t odometry_calculate_pose(motor_pair_data_t r_data)
 {
-    float delta_phi_l = r_data.motor_left_angle_measured;
-    float delta_phi_r = r_data.motor_right_angle_measured;
+    int delta_phi_l = r_data.mleft_real_pulses;
+    int delta_phi_r = r_data.mright_real_pulses;
 
     // printf("delta_phi_l: %f, delta_phi_r: %f \n", delta_phi_l, delta_phi_r);
 

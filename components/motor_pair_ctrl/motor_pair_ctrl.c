@@ -48,7 +48,10 @@ esp_err_t calculate_lspb_speed_point(const int tf, int t, const float qf, float 
     }
     else if (t >= tf - tb)
     {
-        point = qf - (V * pow(tf, 2)) / (2 * tb) + (V * tf) / tb * t - V / (2 * tb) * pow(t, 2);
+        if(t == tf)
+            point = qf;
+        else
+            point = qf - (V * pow(tf, 2)) / (2 * tb) + (V * tf) / tb * t - V / (2 * tb) * pow(t, 2);
     }
     else
     {
@@ -137,7 +140,7 @@ esp_err_t motor_pair_init_individual_motor(motor_config_t *motor_config, motor_p
     ESP_ERROR_CHECK(pcnt_new_unit(&motor_pcnt_config, &motor_pcnt_unit));
 
     pcnt_glitch_filter_config_t pcnt_filter_config = {
-        .max_glitch_ns = 100,
+        .max_glitch_ns = 1000,
     };
 
     ESP_ERROR_CHECK(pcnt_unit_set_glitch_filter(motor_pcnt_unit, &pcnt_filter_config));
@@ -173,7 +176,7 @@ esp_err_t motor_pair_init_individual_motor(motor_config_t *motor_config, motor_p
         .ki = motor_config->pid_config.ki,
         .kd = motor_config->pid_config.kd,
         .cal_type = PID_CAL_TYPE_INCREMENTAL,
-        .max_output = pair_config->bdc_mcpwm_timer_resolution_hz / pair_config->pwm_freq_hz,
+        .max_output = pair_config->bdc_mcpwm_timer_resolution_hz / motor_config->pwm_freq_hz,
         .min_output = 0,
         .max_integral = 1000,
         .min_integral = -1000,
@@ -200,29 +203,6 @@ esp_err_t motor_pair_init(motor_pair_config_t *config, motor_pair_handle_t *pvHa
 
     ESP_ERROR_CHECK(motor_pair_init_individual_motor(&config->motor_left_config, &config->bdc_config, &pvHandle->motor_left_ctx));
     ESP_ERROR_CHECK(motor_pair_init_individual_motor(&config->motor_right_config, &config->bdc_config, &pvHandle->motor_right_ctx));
-
-    // Enable both motors
-    //ESP_ERROR_CHECK(motor_pair_enable_motors(pvHandle));
-    
-    // ESP_LOGI(TAG, "Starting encoder unit: %s", pvHandle->motor_left_ctx.motor_id);
-    // ESP_ERROR_CHECK(pcnt_unit_enable(pvHandle->motor_left_ctx.pcnt_encoder));
-    // ESP_LOGI(TAG, "Starting encoder unit: %s", pvHandle->motor_right_ctx.motor_id);
-    // ESP_ERROR_CHECK(pcnt_unit_enable(pvHandle->motor_right_ctx.pcnt_encoder));
-
-    // ESP_ERROR_CHECK(pcnt_unit_clear_count(pvHandle->motor_left_ctx.pcnt_encoder));
-    // ESP_ERROR_CHECK(pcnt_unit_clear_count(pvHandle->motor_right_ctx.pcnt_encoder));
-
-    // ESP_ERROR_CHECK(pcnt_unit_start(pvHandle->motor_left_ctx.pcnt_encoder));
-    // ESP_ERROR_CHECK(pcnt_unit_start(pvHandle->motor_right_ctx.pcnt_encoder));
-
-    // ESP_LOGI(TAG, "Enabling motor: %s", pvHandle->motor_left_ctx.motor_id);
-    // ESP_ERROR_CHECK(bdc_motor_enable(pvHandle->motor_left_ctx.motor));
-
-    // ESP_LOGI(TAG, "Enabling motor: %s", pvHandle->motor_right_ctx.motor_id);
-    // ESP_ERROR_CHECK(bdc_motor_enable(pvHandle->motor_right_ctx.motor));
-
-    // ESP_ERROR_CHECK(bdc_motor_brake(pvHandle->motor_left_ctx.motor));
-    // ESP_ERROR_CHECK(bdc_motor_brake(pvHandle->motor_right_ctx.motor));
 
     return ESP_OK;
 }

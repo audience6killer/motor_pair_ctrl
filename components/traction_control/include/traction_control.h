@@ -53,6 +53,14 @@ esp_err_t traction_control_soft_start(float target_speed, int tf);
 /**
  * @brief 
  * 
+ * @return true if is busy 
+ * @return false 
+ */
+bool traction_control_is_busy(void);
+
+/**
+ * @brief 
+ * 
  * @return QueueHandle_t 
  */
 QueueHandle_t traction_control_get_queue_handle(void);

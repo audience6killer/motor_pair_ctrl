@@ -13,12 +13,22 @@
 #include "traction_control.h"
 #include "pid_ctrl.h"
 
+#ifndef MIN
+#define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
+#endif
+
+#ifndef MAX
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#endif
+
 #define X_D 2.00f
 #define Y_D 2.00f
-#define THETA_D M_PI / 2
-#define V_COMM 1.688f
-#define WHEEL_RADIUS 0.033
-#define DISTANCE_TH     0.05   // 5 cm
+#define THETA_D 0.00f
+#define V_COMM 0.70f
+#define V_MAX   1.688f
+#define WHEEL_RADIUS 0.033f
+#define DISTANCE_TH 0.05f // 5 cm
+#define ORIENTATION_TH 0.174533f
 #define RADS2REVS(b) (b * 0.1592f)
 
 static const char TAG[] = "navigation_unit";
@@ -46,12 +56,18 @@ esp_err_t navigation_position_control(float x_error, float y_error, float theta_
 
     float omega_comm = 0.0f;
 
-    ESP_ERROR_CHECK(pid_compute(navigation_handle->position_pid_ctrl, theta_error, &omega_comm));
+    ESP_ERROR_CHECK(pid_compute(navigation_handle->orientation_pid_ctrl, theta_error, &omega_comm));
 
-    float phi_lp = (V_COMM - omega_comm) / WHEEL_RADIUS;
-    float phi_rp = (V_COMM + omega_comm) / WHEEL_RADIUS;
+    float phi_lp = RADS2REVS( (V_COMM - omega_comm) / WHEEL_RADIUS );
+    float phi_rp = RADS2REVS( (V_COMM + omega_comm) / WHEEL_RADIUS );
+    
+    phi_lp = MIN( MAX(phi_lp, -V_MAX), V_MAX );
+    phi_rp = MIN( MAX(phi_rp, -V_MAX), V_MAX );
 
-    ESP_ERROR_CHECK(traction_control_speed_controlled_direction((float)RADS2REVS(phi_lp), (float)RADS2REVS(phi_rp)));
+    printf("omega_comm,%f,", omega_comm);
+    //printf("phi_lp: %f, phi_rp: %f\t", phi_lp, phi_rp);
+
+    ESP_ERROR_CHECK(traction_control_speed_controlled_direction(phi_lp, phi_rp));
 
     return ESP_OK;
 }
@@ -65,19 +81,29 @@ esp_err_t navigation_position_follower(odometry_robot_pose_t *c_pose)
     float theta_error = theta_m - c_pose->theta;
 
     float dist_error = sqrtf(powf(x_error, 2) + powf(y_error, 2));
-    
-    if(fabs(dist_error) <= DISTANCE_TH)
-        ESP_ERROR_CHECK( navigation_orientation_control(theta_error) );
-    else
-        ESP_ERROR_CHECK( navigation_position_control(x_error, y_error, theta_error) );
 
-    return ESP_OK; 
+
+    if (fabs(dist_error) >= DISTANCE_TH)
+    {
+        ESP_ERROR_CHECK(navigation_position_control(x_error, y_error, theta_error));
+        printf("distance,%f,theta_error,%f,", dist_error, theta_error);
+    }
+    //else if (fabs(theta_error) >= ORIENTATION_TH)
+        //ESP_ERROR_CHECK(navigation_orientation_control(theta_error));
+    else
+    {
+        ESP_LOGI(TAG, "Vehicle reached point: (%f, %f, theta:%f)\n", X_D, Y_D, THETA_D);
+        ESP_ERROR_CHECK(traction_control_speed_controlled_direction(0.0f, 0.0f));
+    }
+
+    return ESP_OK;
 }
 
 esp_err_t navigation_unit_init(void)
 {
     ESP_RETURN_ON_FALSE(navigation_handle != NULL, ESP_ERR_INVALID_STATE, "TAG", "navigation_handle is null when calculating pos control");
 
+    ESP_LOGI(TAG, "Initatilizing navigation unit");
     pid_ctrl_parameter_t navigation_pos_pid_runtime_param = {
         .kp = NAVIGATION_UNIT_POS_KP,
         .kd = NAVIGATION_UNIT_POS_KD,
@@ -91,29 +117,29 @@ esp_err_t navigation_unit_init(void)
     pid_ctrl_parameter_t navigation_ori_pid_runtime_param = {
         .kp = NAVIGATION_UNIT_ORI_KP,
         .kd = NAVIGATION_UNIT_ORI_KD,
-        .ki = 0.0,
-        .cal_type = PID_CAL_TYPE_POSITIONAL,
-        .max_integral = 10,
-        .min_integral = -10,
-        .min_output = -200,
+        .ki = 0.1,
+        .cal_type = PID_CAL_TYPE_INCREMENTAL,
+        .max_integral = 100,
+        .min_integral = -100,
+        .min_output = -400,
     };
 
     pid_ctrl_block_handle_t navigation_pos_pid_ctrl = NULL;
     pid_ctrl_block_handle_t navigation_ori_pid_ctrl = NULL;
 
-    const pid_ctrl_config_t navigation_pos_pid_config = {
+    pid_ctrl_config_t navigation_pos_pid_config = {
         .init_param = navigation_pos_pid_runtime_param,
     };
 
-    const pid_ctrl_config_t navigation_ori_pid_config = {
+    pid_ctrl_config_t navigation_ori_pid_config = {
         .init_param = navigation_ori_pid_runtime_param,
     };
 
-    ESP_ERROR_CHECK(pid_new_control_block(&navigation_pos_pid_config, navigation_pos_pid_ctrl));
-    ESP_ERROR_CHECK(pid_new_control_block(&navigation_ori_pid_config, navigation_ori_pid_ctrl));
+    ESP_ERROR_CHECK(pid_new_control_block(&navigation_pos_pid_config, &navigation_pos_pid_ctrl));
+    ESP_ERROR_CHECK(pid_new_control_block(&navigation_ori_pid_config, &navigation_ori_pid_ctrl));
 
     navigation_handle->position_pid_ctrl = navigation_pos_pid_ctrl;
-    navigation_handle->orientation_pid_ctrl = navigation_pos_pid_ctrl;
+    navigation_handle->orientation_pid_ctrl = navigation_ori_pid_ctrl;
 
     return ESP_OK;
 }
@@ -127,23 +153,27 @@ static void navigation_unit_task(void *pvParameters)
 
     QueueHandle_t odometry_queue_handle = odometry_unit_get_queue_handle();
 
+    // Start up traction soft start
+    // const float target_speed = V_COMM;
+    const int tf = 200;
+    //traction_control_soft_start(V_COMM, tf);
+
     odometry_robot_pose_t vehicle_pose;
 
     for (;;)
     {
         if (xQueueReceive(odometry_queue_handle, &vehicle_pose, portMAX_DELAY) == pdPASS)
         {
-            printf("/*x,%f,y,%f,theta,%f*/\r\n", vehicle_pose.x, vehicle_pose.y, vehicle_pose.theta);
-
-            ESP_ERROR_CHECK(navigation_position_follower(&vehicle_pose));
-
+            printf(" x,%f,y,%f,theta,%f\r\n", vehicle_pose.x, vehicle_pose.y, vehicle_pose.theta);
+            if (!traction_control_is_busy())
+                ESP_ERROR_CHECK(navigation_position_follower(&vehicle_pose));
         }
         else
         {
             ESP_LOGE(TAG, "Failed to receive queue");
         }
 
-        vTaskDelay(30);
+        // vTaskDelay(30);
     }
 }
 
