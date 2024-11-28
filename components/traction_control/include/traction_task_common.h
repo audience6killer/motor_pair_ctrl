@@ -45,8 +45,8 @@
 //#define TRACTION_MOTOR_RIGHT_KI             0.4
 //#define TRACTION_MOTOR_RIGHT_KD             0.2
 
-#define TRACTION_ML_MAX_PULSES              54
-#define TRACTION_MR_MAX_PULSES              39
+#define TRACTION_ML_MAX_PULSES              18
+#define TRACTION_MR_MAX_PULSES              40
 
 #define TRACTION_M_LEFT_MAX_SPEED_REVS      6.0f
 #define TRACTION_M_RIGHT_MAX_SPEED_REVS     2.0f
