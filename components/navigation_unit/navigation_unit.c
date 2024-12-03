@@ -22,7 +22,7 @@
 #endif
 
 #define X_D 4.00f
-#define Y_D 2.00f
+#define Y_D 4.00f
 #define THETA_D M_PI
 #define V_COMM 1.00f
 #define V_MAX 2.00f
@@ -69,9 +69,6 @@ esp_err_t navigation_position_control(float theta_error)
     // ERROR HERE!
     float phi_lp = V_COMM - (omega_comm / WHEEL_RADIUS);
     float phi_rp = V_COMM + (omega_comm / WHEEL_RADIUS);
-
-    // phi_lp = RADS2REVS(phi_lp);
-    // phi_rp = RADS2REVS(phi_rp);
 
     phi_lp = MIN(MAX(phi_lp, -V_MAX), V_MAX);
     phi_rp = MIN(MAX(phi_rp, -V_MAX), V_MAX);
@@ -136,7 +133,7 @@ esp_err_t navigation_unit_init(void)
     pid_ctrl_parameter_t navigation_pos_pid_runtime_param = {
         .kp = NAVIGATION_UNIT_POS_KP,
         .kd = NAVIGATION_UNIT_POS_KD,
-        .ki = 0.0,
+        .ki = 0.1,
         .cal_type = PID_CAL_TYPE_POSITIONAL,
         .max_integral = 10,
         .min_integral = -10,
