@@ -8,7 +8,7 @@
 #define NAVIGATION_UNIT_POS_KP              0.4f
 #define NAVIGATION_UNIT_POS_KD              0.2f
 
-#define NAVIGATION_UNIT_ORI_KP              20.0f
-#define NAVIGATION_UNIT_ORI_KD              0.0f
+#define NAVIGATION_UNIT_ORI_KP              0.4f
+#define NAVIGATION_UNIT_ORI_KD              0.2f
 
 #endif

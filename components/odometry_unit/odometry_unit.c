@@ -85,8 +85,8 @@ esp_err_t odometry_calculate_pose(motor_pair_data_t r_data)
     // printf("phi_r: %d, phi_l_r: %d, phi_l: %d\n", delta_phi_r, phi_l_in_r, delta_phi_l);
 
     // Update vehicle's wheel angle. Rolling average
-    g_vehicle_pose.phi_l += phi_l_in_r;  // g_vehicle_pose.phi_l + ((delta_phi_l - g_vehicle_pose.phi_l) / (g_reading_count + 1));
-    g_vehicle_pose.phi_r += delta_phi_r; // g_vehicle_pose.phi_r + ((delta_phi_r - g_vehicle_pose.phi_r) / (g_reading_count + 1));
+    g_vehicle_pose.phi_l += phi_l_in_r;  
+    g_vehicle_pose.phi_r += delta_phi_r;
 
     // g_reading_count++;
 
@@ -124,7 +124,7 @@ static void odometry_unit_task(void *pvParameters)
     esp_timer_handle_t odometry_timer_handle = NULL;
     ESP_ERROR_CHECK(esp_timer_create(&odometry_timer_args, &odometry_timer_handle));
 
-    ESP_ERROR_CHECK(esp_timer_start_periodic(odometry_timer_handle, 1E6));
+    ESP_ERROR_CHECK(esp_timer_start_periodic(odometry_timer_handle, 10E3));
 
     odometry_queue_handle = xQueueCreate(4, sizeof(odometry_robot_pose_t));
 
@@ -134,7 +134,7 @@ static void odometry_unit_task(void *pvParameters)
         {
             ESP_ERROR_CHECK(odometry_calculate_pose(traction_data));
 
-#if false 
+#if true 
             printf("/*left_setpoint,%d,speed_left,%d,right_setpoint,%d,speed_right,%d,state,%d,x,%.3f,y,%.3f,theta,%.3f*/\r\n", traction_data.mleft_set_point, traction_data.mleft_real_pulses, traction_data.mright_set_point, traction_data.mright_real_pulses, traction_data.state, g_vehicle_pose.x, g_vehicle_pose.y, g_vehicle_pose.theta);
 #endif
         }
