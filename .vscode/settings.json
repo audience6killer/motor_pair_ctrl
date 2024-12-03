@@ -16,7 +16,8 @@
     "editor.wordWrap": "on",
     "files.associations": {
         "*.ejs": "html",
-        "traction_control.h": "c"
+        "traction_control.h": "c",
+        "traction_task_common.h": "c"
     },
     "idf.flashType": "UART"
 }

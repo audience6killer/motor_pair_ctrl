@@ -6,8 +6,8 @@
 #include "esp_log.h"
 #include "esp_check.h"
 
-#include "navigation_unit.h"
-#include "navigation_unit_task_common.h"
+#include "differential_drive_ctrl.h"
+#include "differential_drive_ctrl_task_common.h"
 
 #include "odometry_unit.h"
 #include "traction_control.h"
