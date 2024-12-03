@@ -8,10 +8,10 @@ typedef struct {
     pid_ctrl_block_handle_t orientation_pid_ctrl;
     float vel_l;    // rad/s -> rev/s
     float vel_r;
-} navigation_unit_handle_t;
+} diff_drive_ctrl_handle_t;
 
 
-void navigation_unit_task_start(void);
+void diff_drive_ctrl_task_start(void);
 
 #endif
 

@@ -21,29 +21,19 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #endif
 
-#define X_D 4.00f
-#define Y_D 4.00f
-#define THETA_D M_PI
-#define V_COMM 1.00f
-#define V_MAX 2.00f
-#define WHEEL_RADIUS 0.033f
-#define DISTANCE_TH 0.05f        // 5 cm
-#define ORIENTATION_TH 0.0872665 // 5°
-#define RADS2REVS(b) (b * 0.1592f)
-
-static const char TAG[] = "navigation_unit";
-static QueueHandle_t navigation_queue_handle;
-static navigation_unit_handle_t *navigation_handle = NULL;
+static const char TAG[] = "diff_drive_ctrl";
+static QueueHandle_t diff_drive_queue_handle;
+static diff_drive_ctrl_handle_t *diff_drive_handle = NULL;
 
 static bool g_point_reached = false;
 static bool g_position_control = false;
 
-esp_err_t navigation_orientation_control(float theta_error)
+esp_err_t diff_drive_orientation_control(float theta_error)
 {
-    ESP_RETURN_ON_FALSE(navigation_handle != NULL, ESP_ERR_INVALID_STATE, "TAG", "navigation_handle is null when calculating pos control");
+    ESP_RETURN_ON_FALSE(diff_drive_handle != NULL, ESP_ERR_INVALID_STATE, "TAG", "diff_drive_handle is null when calculating pos control");
 
     float omega_comm = 0.0f;
-    ESP_ERROR_CHECK(pid_compute(navigation_handle->orientation_pid_ctrl, theta_error, &omega_comm));
+    ESP_ERROR_CHECK(pid_compute(diff_drive_handle->orientation_pid_ctrl, theta_error, &omega_comm));
 
     // printf("e_theta, %f, omega_comm,%f,", theta_error, omega_comm);
 
@@ -58,15 +48,14 @@ esp_err_t navigation_orientation_control(float theta_error)
     return ESP_OK;
 }
 
-esp_err_t navigation_position_control(float theta_error)
+esp_err_t diff_drive_position_control(float theta_error)
 {
-    ESP_RETURN_ON_FALSE(navigation_handle != NULL, ESP_ERR_INVALID_STATE, "TAG", "navigation_handle is null when calculating pos control");
+    ESP_RETURN_ON_FALSE(diff_drive_handle != NULL, ESP_ERR_INVALID_STATE, "TAG", "diff_drive_handle is null when calculating pos control");
 
     float omega_comm = 0.0f;
 
-    ESP_ERROR_CHECK(pid_compute(navigation_handle->position_pid_ctrl, theta_error, &omega_comm));
+    ESP_ERROR_CHECK(pid_compute(diff_drive_handle->position_pid_ctrl, theta_error, &omega_comm));
 
-    // ERROR HERE!
     float phi_lp = V_COMM - (omega_comm / WHEEL_RADIUS);
     float phi_rp = V_COMM + (omega_comm / WHEEL_RADIUS);
 
@@ -81,7 +70,7 @@ esp_err_t navigation_position_control(float theta_error)
     return ESP_OK;
 }
 
-esp_err_t navigation_position_follower(odometry_robot_pose_t *c_pose)
+esp_err_t diff_drive_point_follower(odometry_robot_pose_t *c_pose)
 {
     float y_error = Y_D - c_pose->y;
     float x_error = X_D - c_pose->x;
@@ -99,13 +88,13 @@ esp_err_t navigation_position_follower(odometry_robot_pose_t *c_pose)
         if (fabs(theta_error) >= ORIENTATION_TH)
         {
             //ESP_LOGI(TAG, "ORIENTATION ONLY");
-            ESP_ERROR_CHECK(navigation_orientation_control(theta_error));
+            ESP_ERROR_CHECK(diff_drive_orientation_control(theta_error));
         }
         else
         {
             g_position_control = true;
             //ESP_LOGI(TAG, "POSITON ONLY");
-            ESP_ERROR_CHECK(navigation_position_control(theta_error));
+            ESP_ERROR_CHECK(diff_drive_position_control(theta_error));
         }
 
         // printf("distance,%f,theta_error,%f,", dist_error, theta_error);
@@ -113,7 +102,7 @@ esp_err_t navigation_position_follower(odometry_robot_pose_t *c_pose)
     else if (fabs(ori_e) >= ORIENTATION_TH)
     {
         //ESP_LOGI(TAG, "POSITON ONLY");
-        ESP_ERROR_CHECK(navigation_orientation_control(ori_e));
+        ESP_ERROR_CHECK(diff_drive_orientation_control(ori_e));
     }
     else
     {
@@ -125,14 +114,14 @@ esp_err_t navigation_position_follower(odometry_robot_pose_t *c_pose)
     return ESP_OK;
 }
 
-esp_err_t navigation_unit_init(void)
+esp_err_t diff_drive_ctrl_init(void)
 {
-    ESP_RETURN_ON_FALSE(navigation_handle != NULL, ESP_ERR_INVALID_STATE, "TAG", "navigation_handle is null when calculating pos control");
+    ESP_RETURN_ON_FALSE(diff_drive_handle != NULL, ESP_ERR_INVALID_STATE, "TAG", "diff_drive_handle is null when calculating pos control");
 
     ESP_LOGI(TAG, "Initatilizing navigation unit");
-    pid_ctrl_parameter_t navigation_pos_pid_runtime_param = {
-        .kp = NAVIGATION_UNIT_POS_KP,
-        .kd = NAVIGATION_UNIT_POS_KD,
+    pid_ctrl_parameter_t diff_drive_pos_pid_runtime_param = {
+        .kp = DIFF_DRIVE_POS_KP,
+        .kd = DIFF_DRIVE_POS_KD,
         .ki = 0.1,
         .cal_type = PID_CAL_TYPE_POSITIONAL,
         .max_integral = 10,
@@ -140,9 +129,9 @@ esp_err_t navigation_unit_init(void)
         .min_output = -200,
     };
 
-    pid_ctrl_parameter_t navigation_ori_pid_runtime_param = {
-        .kp = NAVIGATION_UNIT_ORI_KP,
-        .kd = NAVIGATION_UNIT_ORI_KD,
+    pid_ctrl_parameter_t diff_drive_ori_pid_runtime_param = {
+        .kp = DIFF_DRIVE_ORI_KP,
+        .kd = DIFF_DRIVE_ORI_KD,
         .ki = 0.1,
         .cal_type = PID_CAL_TYPE_INCREMENTAL,
         .max_integral = 10,
@@ -151,39 +140,34 @@ esp_err_t navigation_unit_init(void)
         .max_output = 5,
     };
 
-    pid_ctrl_block_handle_t navigation_pos_pid_ctrl = NULL;
-    pid_ctrl_block_handle_t navigation_ori_pid_ctrl = NULL;
+    pid_ctrl_block_handle_t diff_drive_pos_pid_ctrl = NULL;
+    pid_ctrl_block_handle_t diff_drive_ori_pid_ctrl = NULL;
 
-    pid_ctrl_config_t navigation_pos_pid_config = {
-        .init_param = navigation_pos_pid_runtime_param,
+    pid_ctrl_config_t diff_drive_pos_pid_config = {
+        .init_param = diff_drive_pos_pid_runtime_param,
     };
 
-    pid_ctrl_config_t navigation_ori_pid_config = {
-        .init_param = navigation_ori_pid_runtime_param,
+    pid_ctrl_config_t diff_drive_ori_pid_config = {
+        .init_param = diff_drive_ori_pid_runtime_param,
     };
 
-    ESP_ERROR_CHECK(pid_new_control_block(&navigation_pos_pid_config, &navigation_pos_pid_ctrl));
-    ESP_ERROR_CHECK(pid_new_control_block(&navigation_ori_pid_config, &navigation_ori_pid_ctrl));
+    ESP_ERROR_CHECK(pid_new_control_block(&diff_drive_pos_pid_config, &diff_drive_pos_pid_ctrl));
+    ESP_ERROR_CHECK(pid_new_control_block(&diff_drive_ori_pid_config, &diff_drive_ori_pid_ctrl));
 
-    navigation_handle->position_pid_ctrl = navigation_pos_pid_ctrl;
-    navigation_handle->orientation_pid_ctrl = navigation_ori_pid_ctrl;
+    diff_drive_handle->position_pid_ctrl = diff_drive_pos_pid_ctrl;
+    diff_drive_handle->orientation_pid_ctrl = diff_drive_ori_pid_ctrl;
 
     return ESP_OK;
 }
 
-static void navigation_unit_task(void *pvParameters)
+static void diff_drive_ctrl_task(void *pvParameters)
 {
 
-    navigation_handle = (navigation_unit_handle_t *)malloc(sizeof(navigation_unit_handle_t));
+    diff_drive_handle = (diff_drive_ctrl_handle_t *)malloc(sizeof(diff_drive_ctrl_handle_t));
 
-    ESP_ERROR_CHECK(navigation_unit_init());
+    ESP_ERROR_CHECK(diff_drive_ctrl_init());
 
     QueueHandle_t odometry_queue_handle = odometry_unit_get_queue_handle();
-
-    // Start up traction soft start
-    // const float target_speed = V_COMM;
-    // const int tf = 100;
-    // traction_control_soft_start(V_COMM, tf);
 
     odometry_robot_pose_t vehicle_pose;
 
@@ -195,7 +179,7 @@ static void navigation_unit_task(void *pvParameters)
             printf("/*x,%f,y,%f,theta,%f*/\r\n", vehicle_pose.x, vehicle_pose.y, vehicle_pose.theta);
 #endif
             if (!traction_control_is_busy() && !g_point_reached)
-                ESP_ERROR_CHECK(navigation_position_follower(&vehicle_pose));
+                ESP_ERROR_CHECK(diff_drive_point_follower(&vehicle_pose));
         }
         else
         {
@@ -206,9 +190,9 @@ static void navigation_unit_task(void *pvParameters)
     }
 }
 
-void navigation_unit_task_start(void)
+void diff_drive_ctrl_task_start(void)
 {
     ESP_LOGI(TAG, "Initializing navigation task");
 
-    xTaskCreatePinnedToCore(&navigation_unit_task, "navigation_unit", NAVIGATION_UNIT_STACK_SIZE, NULL, NAVIGATION_UNIT_TASK_PRIORITY, NULL, NAVIGATION_UNIT_CORE_ID);
+    xTaskCreatePinnedToCore(&diff_drive_ctrl_task, "navigation_unit", DIFF_DRIVE_STACK_SIZE, NULL, DIFF_DRIVE_TASK_PRIORITY, NULL, DIFF_DRIVE_CORE_ID);
 }
