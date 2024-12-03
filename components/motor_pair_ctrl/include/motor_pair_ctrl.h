@@ -12,7 +12,6 @@
 #define MOTOR_PAIR_CTRL_H
 
 #include <stdint.h>
-#include "queue.h"
 #include "driver/pulse_cnt.h"
 #include "bdc_motor.h"
 #include "pid_ctrl.h"
@@ -58,7 +57,6 @@ typedef struct
     pid_ctrl_block_handle_t pid_ctrl;
     char motor_id[20];
     int report_pulses;
-    queue_t *speed_queue;
     int desired_speed; // In pulses
 } motor_control_context_t;
 
@@ -111,15 +109,6 @@ esp_err_t calculate_lspb_speed_point(const int tf, int t, const float qf, float 
  */
 esp_err_t motor_pair_set_speed(int motor_left_speed, int motor_right_speed, motor_pair_handle_t *motor_pair);
 
-/**
- * @brief Speed have to be in rev/s
- *
- * @param motor_left_speed
- * @param motor_right_speed
- * @param motor_pair
- * @return esp_err_t
- */
-esp_err_t motor_pair_add_speed_to_queue(float motor_left_speed, float motor_right_speed, motor_pair_handle_t *motor_pair);
 
 /**
  * @brief Enable motor pair: bdc and pcnt units

@@ -17,7 +17,8 @@
     "files.associations": {
         "*.ejs": "html",
         "traction_control.h": "c",
-        "traction_task_common.h": "c"
+        "traction_task_common.h": "c",
+        "queue": "cpp"
     },
     "idf.flashType": "UART"
 }

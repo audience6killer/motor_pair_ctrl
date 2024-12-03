@@ -116,13 +116,6 @@ static void seed_planter_pid_loop_cb(void *args)
     else
     {
         // Check wheater there is another speed value in the queue
-        if (!is_queue_empty(seed_planter_handle->motor_left_ctx.speed_queue) && !is_queue_empty(seed_planter_handle->motor_right_ctx.speed_queue))
-        {
-            float cutter_disc_speed, seed_dispenser_speed;
-            ESP_ERROR_CHECK(dequeue(seed_planter_handle->motor_left_ctx.speed_queue, &cutter_disc_speed));
-            ESP_ERROR_CHECK(dequeue(seed_planter_handle->motor_right_ctx.speed_queue, &seed_dispenser_speed));
-            seed_planter_set_speed(cutter_disc_speed, seed_dispenser_speed);
-        }
     }
 
     if (last_seed_planter_state != SP_BRAKE && last_seed_planter_state != SP_STOPPED)

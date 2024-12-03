@@ -25,8 +25,6 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #endif
 
-#define SPEED_QUEUE_SIZE 10
-
 static const char TAG[] = "motor_pair";
 
 esp_err_t calculate_lspb_speed_point(const int tf, int t, const float qf, float *pvPoint)
@@ -68,15 +66,6 @@ esp_err_t motor_pair_set_speed(int motor_left_speed, int motor_right_speed, moto
 {
     motor_pair->motor_left_ctx.desired_speed = motor_left_speed;
     motor_pair->motor_right_ctx.desired_speed = motor_right_speed;
-
-    return ESP_OK;
-}
-
-esp_err_t motor_pair_add_speed_to_queue(float motor_left_speed, float motor_right_speed, motor_pair_handle_t *motor_pair)
-{
-    ESP_ERROR_CHECK(enqueue(motor_pair->motor_left_ctx.speed_queue, motor_left_speed));
-    
-    ESP_ERROR_CHECK(enqueue(motor_pair->motor_right_ctx.speed_queue, motor_right_speed));
 
     return ESP_OK;
 }
@@ -191,8 +180,6 @@ esp_err_t motor_pair_init_individual_motor(motor_config_t *motor_config, motor_p
 
     pvMotor->pid_ctrl = motor_pid_ctrl;
 
-    // Motor queue setup
-    pvMotor->speed_queue = create_queue(SPEED_QUEUE_SIZE);
 
     return ESP_OK;
 }

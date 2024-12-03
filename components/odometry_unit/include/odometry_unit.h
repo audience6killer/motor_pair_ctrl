@@ -2,6 +2,9 @@
 #ifndef ODOMETRY_UNIT_H
 #define ODOMETRY_UNIT_H
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+
 typedef struct odometry_robot_pose
 {
     float x;

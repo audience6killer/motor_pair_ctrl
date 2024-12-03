@@ -70,7 +70,7 @@ esp_err_t diff_drive_position_control(float theta_error)
     return ESP_OK;
 }
 
-esp_err_t diff_drive_point_follower(odometry_robot_pose_t *c_pose)
+esp_err_t diff_drive_point_follower(navigation_point_t *c_pose)
 {
     float y_error = Y_D - c_pose->y;
     float x_error = X_D - c_pose->x;
@@ -112,6 +112,11 @@ esp_err_t diff_drive_point_follower(odometry_robot_pose_t *c_pose)
     }
 
     return ESP_OK;
+}
+
+bool diff_drive_point_reached(void)
+{
+    return g_point_reached;
 }
 
 esp_err_t diff_drive_ctrl_init(void)
@@ -160,6 +165,11 @@ esp_err_t diff_drive_ctrl_init(void)
     return ESP_OK;
 }
 
+QueueHandle_t diff_drive_get_queue_handle(void)
+{
+    return diff_drive_queue_handle;
+}
+
 static void diff_drive_ctrl_task(void *pvParameters)
 {
 
@@ -169,11 +179,13 @@ static void diff_drive_ctrl_task(void *pvParameters)
 
     QueueHandle_t odometry_queue_handle = odometry_unit_get_queue_handle();
 
-    odometry_robot_pose_t vehicle_pose;
+    navigation_point_t vehicle_pose;
+
+    diff_drive_queue_handle = xQueueCreate(4, sizeof(navigation_point_t));
 
     for (;;)
     {
-        if (xQueueReceive(odometry_queue_handle, &vehicle_pose, portMAX_DELAY) == pdPASS)
+        if (xQueueReceive(diff_drive_queue_handle, &vehicle_pose, portMAX_DELAY) == pdPASS)
         {
 #if false
             printf("/*x,%f,y,%f,theta,%f*/\r\n", vehicle_pose.x, vehicle_pose.y, vehicle_pose.theta);

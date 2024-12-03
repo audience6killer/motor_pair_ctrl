@@ -13,7 +13,7 @@
 
 #define X_D                            4.00f
 #define Y_D                            4.00f
-#define THETA_D M_PI
+#define THETA_D                        M_PI
 #define V_COMM                         1.00f
 #define V_MAX                          2.00f
 #define WHEEL_RADIUS                   0.033f
