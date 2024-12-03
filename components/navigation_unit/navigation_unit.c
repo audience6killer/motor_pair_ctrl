@@ -21,14 +21,14 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #endif
 
-#define X_D 0.00f
-#define Y_D 0.00f
-#define THETA_D         M_PI 
-#define V_COMM          1.00f
-#define V_MAX           2.00f
-#define WHEEL_RADIUS    0.033f
-#define DISTANCE_TH     0.05f // 5 cm
-#define ORIENTATION_TH  0.0872665 // 5° 
+#define X_D 4.00f
+#define Y_D 2.00f
+#define THETA_D M_PI
+#define V_COMM 1.00f
+#define V_MAX 2.00f
+#define WHEEL_RADIUS 0.033f
+#define DISTANCE_TH 0.05f        // 5 cm
+#define ORIENTATION_TH 0.0872665 // 5°
 #define RADS2REVS(b) (b * 0.1592f)
 
 static const char TAG[] = "navigation_unit";
@@ -36,6 +36,7 @@ static QueueHandle_t navigation_queue_handle;
 static navigation_unit_handle_t *navigation_handle = NULL;
 
 static bool g_point_reached = false;
+static bool g_position_control = false;
 
 esp_err_t navigation_orientation_control(float theta_error)
 {
@@ -44,7 +45,7 @@ esp_err_t navigation_orientation_control(float theta_error)
     float omega_comm = 0.0f;
     ESP_ERROR_CHECK(pid_compute(navigation_handle->orientation_pid_ctrl, theta_error, &omega_comm));
 
-    //printf("e_theta, %f, omega_comm,%f,", theta_error, omega_comm);
+    // printf("e_theta, %f, omega_comm,%f,", theta_error, omega_comm);
 
     float phi_lp = (-1.00f) * omega_comm / WHEEL_RADIUS;
     float phi_rp = omega_comm / WHEEL_RADIUS;
@@ -75,8 +76,8 @@ esp_err_t navigation_position_control(float theta_error)
     phi_lp = MIN(MAX(phi_lp, -V_MAX), V_MAX);
     phi_rp = MIN(MAX(phi_rp, -V_MAX), V_MAX);
 
-    printf("omega_comm,%f,", omega_comm);
-    // printf("phi_lp: %f, phi_rp: %f\t", phi_lp, phi_rp);
+    // printf("omega_comm,%f,", omega_comm);
+    //  printf("phi_lp: %f, phi_rp: %f\t", phi_lp, phi_rp);
 
     ESP_ERROR_CHECK(traction_control_speed_controlled_direction(phi_lp, phi_rp));
 
@@ -94,15 +95,27 @@ esp_err_t navigation_position_follower(odometry_robot_pose_t *c_pose)
     float dist_error = sqrtf(powf(x_error, 2) + powf(y_error, 2));
     float ori_e = THETA_D - c_pose->theta;
 
-    //printf(",ori_e,%f\n", ori_e);
+    // printf(",ori_e,%f\n", ori_e);
 
-    //if (dist_error > DISTANCE_TH)
-    //{
-    //    ESP_ERROR_CHECK(navigation_position_control(theta_error));
-    //    // printf("distance,%f,theta_error,%f,", dist_error, theta_error);
-    //}
-    if (fabs(ori_e) >= ORIENTATION_TH)
+    if (dist_error > DISTANCE_TH)
     {
+        if (fabs(theta_error) >= ORIENTATION_TH)
+        {
+            //ESP_LOGI(TAG, "ORIENTATION ONLY");
+            ESP_ERROR_CHECK(navigation_orientation_control(theta_error));
+        }
+        else
+        {
+            g_position_control = true;
+            //ESP_LOGI(TAG, "POSITON ONLY");
+            ESP_ERROR_CHECK(navigation_position_control(theta_error));
+        }
+
+        // printf("distance,%f,theta_error,%f,", dist_error, theta_error);
+    }
+    else if (fabs(ori_e) >= ORIENTATION_TH)
+    {
+        //ESP_LOGI(TAG, "POSITON ONLY");
         ESP_ERROR_CHECK(navigation_orientation_control(ori_e));
     }
     else
@@ -172,8 +185,8 @@ static void navigation_unit_task(void *pvParameters)
 
     // Start up traction soft start
     // const float target_speed = V_COMM;
-    //const int tf = 100;
-    //traction_control_soft_start(V_COMM, tf);
+    // const int tf = 100;
+    // traction_control_soft_start(V_COMM, tf);
 
     odometry_robot_pose_t vehicle_pose;
 
@@ -181,9 +194,9 @@ static void navigation_unit_task(void *pvParameters)
     {
         if (xQueueReceive(odometry_queue_handle, &vehicle_pose, portMAX_DELAY) == pdPASS)
         {
-            #if false
+#if false
             printf("/*x,%f,y,%f,theta,%f*/\r\n", vehicle_pose.x, vehicle_pose.y, vehicle_pose.theta);
-            #endif
+#endif
             if (!traction_control_is_busy() && !g_point_reached)
                 ESP_ERROR_CHECK(navigation_position_follower(&vehicle_pose));
         }
@@ -192,7 +205,7 @@ static void navigation_unit_task(void *pvParameters)
             ESP_LOGE(TAG, "Failed to receive queue");
         }
 
-        //vTaskDelay(10);
+        // vTaskDelay(10);
     }
 }
 
