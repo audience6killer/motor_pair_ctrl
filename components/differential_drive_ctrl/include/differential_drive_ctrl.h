@@ -2,6 +2,7 @@
 #define NAVIGATION_UNIT_H
 
 #include "pid_ctrl.h"
+#include "kalman_filter.h"
 
 typedef struct
 {
@@ -11,16 +12,15 @@ typedef struct
     float vel_r;
 } diff_drive_ctrl_handle_t;
 
-typedef struct
-{
-    float x;
-    float y;
-    float theta;
-} navigation_point_t;
+
+typedef enum {
+    POINT_REACHED,
+    NAVIGATING
+} diff_drive_state_t;
 
 QueueHandle_t diff_drive_get_queue_handle(void);
 
-bool diff_drive_point_reached(void);
+esp_err_t diff_drive_set_navigation_point(navigation_point_t point);
 
 void diff_drive_ctrl_task_start(void);
 

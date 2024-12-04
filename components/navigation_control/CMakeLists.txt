@@ -1,3 +1,3 @@
-idf_component_register(SRCS "navigation_control.cpp"
+idf_component_register(SRCS "waypoint_controller.cpp"
                     INCLUDE_DIRS "include"
-                    REQUIRES differential_drive_ctrl odometry_unit)
+                    REQUIRES differential_drive_ctrl)
