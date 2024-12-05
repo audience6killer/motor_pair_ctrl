@@ -5,14 +5,19 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 
-typedef struct odometry_robot_pose
-{
+typedef enum {
+    ODO_STOPPED,
+    ODO_READING
+} odometry_state_e;
+
+typedef struct {
     float x;
     float y;
     float phi_l;
     float phi_r;
     float theta; // In degrees
-} odometry_robot_pose_t;
+    odometry_state_e odometry_state;
+} odometry_data_t;
 
 /**
  * @brief 

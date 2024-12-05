@@ -2,6 +2,7 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+#include "esp_check.h"
 
 #include "kalman_filter.h"
 #include "kalman_filter_task_common.h"
@@ -13,13 +14,15 @@ static QueueHandle_t g_kalman_queue_handle = NULL;
 
 QueueHandle_t kalman_fiter_get_queue(void)
 {
+    ESP_RETURN_ON_FALSE(g_kalman_queue_handle != NULL, ESP_ERR_INVALID_STATE, TAG, "Retriving queue handle uniniatilized");
+
     return g_kalman_queue_handle;
 }
 
 static void kalman_filter_task(void *pvParameters)
 {
     QueueHandle_t odometry_queue_pv = odometry_unit_get_queue_handle();
-    odometry_robot_pose_t odo_robot_pose;
+    odometry_data_t odo_robot_pose;
 
     navigation_point_t nav_point;
 

@@ -72,10 +72,10 @@ esp_err_t diff_drive_position_control(float theta_error)
 esp_err_t diff_drive_send2queue(diff_drive_state_t state)
 {
     diff_drive_state_t s = state;
-    
+
     ESP_RETURN_ON_FALSE(diff_drive_queue_handle != NULL, ESP_ERR_INVALID_STATE, TAG, "trying to send msg to queue before init");
 
-    if(xQueueSend(diff_drive_queue_handle, &s, portMAX_DELAY) != pdPASS)
+    if (xQueueSend(diff_drive_queue_handle, &s, portMAX_DELAY) != pdPASS)
     {
         ESP_LOGE(TAG, "Error sending queue");
         return ESP_FAIL;
@@ -95,8 +95,6 @@ esp_err_t diff_drive_point_follower(navigation_point_t *c_pose)
     float dist_error = sqrtf(powf(x_error, 2) + powf(y_error, 2));
     float ori_e = g_current_point.theta - c_pose->theta;
 
-    // printf(",ori_e,%f\n", ori_e);
-
     if (dist_error > DISTANCE_TH)
     {
         if (fabs(theta_error) >= ORIENTATION_TH)
@@ -107,7 +105,6 @@ esp_err_t diff_drive_point_follower(navigation_point_t *c_pose)
         {
             ESP_ERROR_CHECK(diff_drive_position_control(theta_error));
         }
-
     }
     else if (fabs(ori_e) >= ORIENTATION_TH)
     {
@@ -125,7 +122,6 @@ esp_err_t diff_drive_point_follower(navigation_point_t *c_pose)
     return ESP_OK;
 }
 
-
 esp_err_t diff_drive_set_navigation_point(navigation_point_t point)
 {
     ESP_RETURN_ON_FALSE(g_current_state == POINT_REACHED, ESP_ERR_INVALID_STATE, TAG, "Trying to change nav point before trajectory is compleated");
@@ -139,7 +135,6 @@ esp_err_t diff_drive_set_navigation_point(navigation_point_t point)
 
     return ESP_OK;
 }
-
 
 esp_err_t diff_drive_ctrl_init(void)
 {
@@ -207,17 +202,19 @@ static void diff_drive_ctrl_task(void *pvParameters)
     };
 
     diff_drive_queue_handle = xQueueCreate(4, sizeof(diff_drive_state_t));
-    
+
     QueueHandle_t kalman_filter_queue_pv = kalman_fiter_get_queue();
 
     navigation_point_t vehicle_pose;
+
+    ESP_ERROR_CHECK(diff_drive_send2queue(g_current_state));
 
     for (;;)
     {
         if (xQueueReceive(kalman_filter_queue_pv, &vehicle_pose, portMAX_DELAY) == pdPASS)
         {
-#if false
-            printf("/*x,%f,y,%f,theta,%f*/\r\n", vehicle_pose.x, vehicle_pose.y, vehicle_pose.theta);
+#if false 
+            printf("/*x,%f,xd,%f,y,%f,yd,%f,theta,%f,thetad,%f,state,%d*/\r\n", vehicle_pose.x, g_current_point.x, vehicle_pose.y, g_current_point.y, vehicle_pose.theta, g_current_point.theta, g_current_state);
 #endif
             if (g_current_state != POINT_REACHED)
                 ESP_ERROR_CHECK(diff_drive_point_follower(&vehicle_pose));
@@ -226,7 +223,6 @@ static void diff_drive_ctrl_task(void *pvParameters)
         {
             ESP_LOGE(TAG, "Failed to receive queue");
         }
-
     }
 }
 

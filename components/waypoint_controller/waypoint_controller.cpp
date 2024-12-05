@@ -14,7 +14,7 @@ extern "C"
 #include "differential_drive_ctrl.h"
 }
 
-static const char TAG[] = "navigation_control";
+static const char TAG[] = "waypoint_controller";
 static QueueHandle_t g_waypoint_queue_handle = NULL;
 static std::queue<navigation_point_t> g_navigation_points;
 static waypoint_ctrl_state_e g_waypoint_state = WP_STOPPED;
@@ -53,6 +53,7 @@ esp_err_t waypoint_controller_trajectory_ctrl(diff_drive_state_t state)
 
         else
         {
+            ESP_LOGI(TAG, "Trajectory finished!");
             ESP_ERROR_CHECK(waypoint_ctrl_send2queue(WP_TRJ_FINISHED));
         }
     }

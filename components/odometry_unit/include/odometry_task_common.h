@@ -3,7 +3,7 @@
 
 #define ODOMETRY_TASK_STACK_SIZE    4096
 #define ODOMETRY_TASK_CORE_ID       0
-#define ODOMETRY_TASK_PRIORITY      8
+#define ODOMETRY_TASK_PRIORITY      4
 #define ODOMETRY_TIMER_LOOP_MS      10
 
 #define WHEEL_RADIUS                0.033f
