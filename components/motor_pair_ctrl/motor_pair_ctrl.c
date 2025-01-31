@@ -64,6 +64,7 @@ esp_err_t calculate_lspb_speed_point(const int tf, int t, const float qf, float 
 
 esp_err_t motor_pair_set_speed(int motor_left_speed, int motor_right_speed, motor_pair_handle_t *motor_pair)
 {
+    //printf("motor_left_speed: %d, motor_right_speed: %d\n", motor_left_speed, motor_right_speed);
     motor_pair->motor_left_ctx.desired_speed = motor_left_speed;
     motor_pair->motor_right_ctx.desired_speed = motor_right_speed;
 

@@ -63,6 +63,7 @@ esp_err_t waypoint_controller_trajectory_ctrl(diff_drive_state_t state)
 
 esp_err_t waypoint_controller_start_trajectory(void)
 {
+    //ESP_LOGI(TAG, "Starting trajectory");
     if (g_navigation_points.size() > 0)
     {
         if (g_waypoint_state == WP_NAVIGATING)

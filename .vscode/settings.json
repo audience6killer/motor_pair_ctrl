@@ -18,7 +18,15 @@
         "*.ejs": "html",
         "traction_control.h": "c",
         "traction_task_common.h": "c",
-        "queue": "cpp"
+        "queue": "cpp",
+        "bit": "c",
+        "compare": "c",
+        "cstddef": "c",
+        "string": "c",
+        "limits": "c",
+        "memory": "c",
+        "new": "c",
+        "functional": "c"
     },
     "idf.flashType": "UART"
 }

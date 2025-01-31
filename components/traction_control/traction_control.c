@@ -196,6 +196,8 @@ esp_err_t traction_control_speed_controlled_direction(float motor_left_speed, fl
     float mleft_abs = fabs(motor_left_speed);
     float mright_abs = fabs(motor_right_speed);
 
+    //printf("mleft_abs: %f, mright_abs: %f\n", mleft_abs, mright_abs);
+
     if (mleft_abs <= TRACTION_M_RIGHT_MAX_SPEED_REVS && mright_abs <= TRACTION_M_RIGHT_MAX_SPEED_REVS)
     {
         if (motor_left_speed < 0.0f && motor_right_speed < 0.0f)
