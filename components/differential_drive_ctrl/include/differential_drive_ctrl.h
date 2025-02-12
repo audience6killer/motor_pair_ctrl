@@ -15,6 +15,7 @@ typedef struct
 
 typedef enum {
     POINT_REACHED,
+    ORIENTING,
     NAVIGATING
 } diff_drive_state_t;
 
