@@ -15,7 +15,7 @@
 #define V_MAX                          2.00f
 #define WHEEL_RADIUS                   0.033f
 #define DISTANCE_TH                    0.05f        // 5 cm
-#define ORIENTATION_TH                 0.0872665 // 5°
+#define ORIENTATION_TH                 0.087266 // 5°
 #define RADS2REVS(b) (b * 0.1592f)
 
 #endif
