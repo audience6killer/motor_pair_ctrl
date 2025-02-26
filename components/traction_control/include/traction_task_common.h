@@ -14,7 +14,7 @@
 #define BDC_PID_LOOP_PERIOD_MS              10
 
 #define TRACTION_MOTORS_MCPWM_GROUP         0
-#define TRACTION_MOTORS_PWM_FREQ            25000       // 25kHz PWM
+#define TRACTION_MOTORS_PWM_FREQ            20000       // 25kHz PWM
 
 #define TRACTION_MOTOR_LEFT_PWMA            14
 #define TRACTION_MOTOR_LEFT_PWMB            27
@@ -29,13 +29,20 @@
 #define MOTOR1_ENCODER_RES                  908
 #define MOTOR2_ENCODER_RES                  908
 
-#define TRACTION_MOTOR_LEFT_KP              0.007859181f
-#define TRACTION_MOTOR_LEFT_KI              3.785918094f
-#define TRACTION_MOTOR_LEFT_KD              0.0000001f
+#define TRACTION_MOTOR_LEFT_KP              0.65f
+#define TRACTION_MOTOR_LEFT_KI              0.54f
+#define TRACTION_MOTOR_LEFT_KD              0.5f
 
-#define TRACTION_MOTOR_RIGHT_KP             0.015922355f
-#define TRACTION_MOTOR_RIGHT_KI             2.184470949f
-#define TRACTION_MOTOR_RIGHT_KD             0.0f
+//#define TRACTION_MOTOR_LEFT_KP              0.007859181f
+//#define TRACTION_MOTOR_LEFT_KI              3.785918094f
+//#define TRACTION_MOTOR_LEFT_KD              0.0000001f
+#define TRACTION_MOTOR_RIGHT_KP             0.65f
+#define TRACTION_MOTOR_RIGHT_KI             0.54f
+#define TRACTION_MOTOR_RIGHT_KD             0.5f
+
+//#define TRACTION_MOTOR_RIGHT_KP             0.015922355f
+//#define TRACTION_MOTOR_RIGHT_KI             2.184470949f
+//#define TRACTION_MOTOR_RIGHT_KD             0.0f
 
 //#define TRACTION_MOTOR_LEFT_KP              0.6 // 6.4
 //#define TRACTION_MOTOR_LEFT_KI              0.4
@@ -45,21 +52,21 @@
 //#define TRACTION_MOTOR_RIGHT_KI             0.4
 //#define TRACTION_MOTOR_RIGHT_KD             0.2
 
-#define TRACTION_ML_MAX_PULSES              18
-#define TRACTION_MR_MAX_PULSES              40
+#define TRACTION_ML_MAX_PULSES              550
+#define TRACTION_MR_MAX_PULSES              550
 
-#define TRACTION_M_LEFT_MAX_SPEED_REVS      6.0f
-#define TRACTION_M_RIGHT_MAX_SPEED_REVS     2.0f
+#define TRACTION_M_LEFT_MAX_SPEED_REVS      2.718f
+#define TRACTION_M_RIGHT_MAX_SPEED_REVS     2.718f
 
 // Fix loosy conversions 
-#define TRACTION_M_RIGHT_REV2PULSES         19.8f 
-#define TRACTION_M_LEFT_REV2PULSES          9.0f
+#define TRACTION_M_RIGHT_REV2PULSES         204.0f 
+#define TRACTION_M_LEFT_REV2PULSES          204.0f
 
-#define TRACTION_M_RIGHT_PULSES2REV         1/19.8
-#define TRACTION_M_LEFT_PULSES2REV          1/9.0
+#define TRACTION_M_RIGHT_PULSES2REV         1/204.0
+#define TRACTION_M_LEFT_PULSES2REV          1/204.0
 
-#define TRM_R_PULSES2RAD                    3.14159265 / 990
-#define TRM_L_PULSES2RAD                    3.14159265 / 450
+#define TRM_R_PULSES2RAD                    3.14159265 / 2040
+#define TRM_L_PULSES2RAD                    3.14159265 / 2040
 
 // Left motor rev/s to pulses/10mS
 #define TRACTION_ML_REV2PULSES(X)    (X * TRACTION_M_LEFT_REV2PULSES)

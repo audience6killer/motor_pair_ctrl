@@ -11,10 +11,10 @@
 #define DIFF_DRIVE_ORI_KP              0.4f
 #define DIFF_DRIVE_ORI_KD              0.2f
 
-#define V_COMM                         8.00f
-#define V_MAX                          2.00f    // 2 rev/s: Motor DER
-#define V_MAX_RADS                     12.466f    // M_der MAX = 2 rev/s
-#define WHEEL_RADIUS                   0.033f
+#define V_COMM                         2.0f
+#define V_MAX                          3.0f    // 2 rev/s: Motor DER
+#define V_MAX_RADS                     3.0f    // M_der MAX = 2 rev/s
+#define WHEEL_RADIUS                   0.2046f
 #define DISTANCE_TH                    0.05f        // 5 cm
 
 #define ORIENTATION_TH                 0.087266 // 5°

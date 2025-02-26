@@ -228,7 +228,7 @@ static void diff_drive_ctrl_task(void *pvParameters)
     {
         if (xQueueReceive(kalman_filter_queue_pv, &vehicle_pose, portMAX_DELAY) == pdPASS)
         {
-#if true 
+#if false 
             printf("/*x,%f,xd,%f,y,%f,yd,%f,theta,%f,thetad,%f,state,%d*/\r\n", vehicle_pose.x, g_current_point.x, vehicle_pose.y, g_current_point.y, vehicle_pose.theta, g_current_point.theta, g_current_state);
 #endif
             if (g_current_state != POINT_REACHED)

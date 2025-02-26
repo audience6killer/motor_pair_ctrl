@@ -26,7 +26,8 @@
         "limits": "c",
         "memory": "c",
         "new": "c",
-        "functional": "c"
+        "functional": "c",
+        "differential_drive_ctrl_task_common.h": "c"
     },
     "idf.flashType": "UART"
 }
