@@ -6,7 +6,7 @@
         "OPENOCD_SCRIPTS": "/home/vill4in/.espressif/tools/openocd-esp32/v0.12.0-esp32-20240318/openocd-esp32/share/openocd/scripts",
         "ESP_ROM_ELF_DIR": "/home/vill4in/.espressif/tools/esp-rom-elfs/20220823/"
     },
-    "idf.espIdfPath": "/home/vill4in/esp/v5.0/esp-idf",
+    "idf.espIdfPath": "/home/vill4in/esp/v5.1.4/esp-idf",
     "idf.openOcdConfigs": [
         "board/esp32-wrover-kit-3.3v.cfg"
     ],
@@ -29,5 +29,6 @@
         "functional": "c",
         "differential_drive_ctrl_task_common.h": "c"
     },
-    "idf.flashType": "UART"
+    "idf.flashType": "UART",
+    "idf.pythonInstallPath": "/usr/bin/python3"
 }

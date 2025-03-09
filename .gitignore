@@ -2,3 +2,5 @@ build/
 sdkconfig
 sdkconfig.old
 .cache/
+managed_components/
+.devcontainer/
