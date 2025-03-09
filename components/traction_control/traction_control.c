@@ -128,8 +128,8 @@ static void traction_pid_loop_cb(void *args)
 
         calculate_lspb_speed_point(g_soft_start_tf, soft_start_counter, g_soft_start_target_speed, &point);
         // traction_control_speed_controlled_direction(point, point);
-        motor_pair_set_speed((int)roundf(TRACTION_ML_REV2PULSES(point)),
-                             (int)roundf(TRACTION_MR_REV2PULSES(point)),
+        motor_pair_set_speed((int)roundf(TRACTION_CONV_REV2PULSES(point)),
+                             (int)roundf(TRACTION_CONV_REV2PULSES(point)),
                              traction_handle);
 
         // ESP_LOGI(TAG, "soft start point: %f", point);
@@ -198,7 +198,7 @@ esp_err_t traction_control_speed_controlled_direction(float motor_left_speed, fl
 
     //printf("mleft_abs: %f, mright_abs: %f\n", mleft_abs, mright_abs);
 
-    if (mleft_abs <= TRACTION_M_RIGHT_MAX_SPEED_REVS && mright_abs <= TRACTION_M_RIGHT_MAX_SPEED_REVS)
+    if (mleft_abs <= TRACTION_MOTOR_MAX_REVS && mright_abs <= TRACTION_MOTOR_MAX_REVS)
     {
         if (motor_left_speed < 0.0f && motor_right_speed < 0.0f)
             traction_control_set_direction(REVERSE);
@@ -212,7 +212,7 @@ esp_err_t traction_control_speed_controlled_direction(float motor_left_speed, fl
             traction_control_set_direction(BRAKE);
 
         // motor_pair_add_speed_to_queue(motor_left_abs, motor_right_abs, traction_handle);
-        motor_pair_set_speed((int)roundf(TRACTION_ML_REV2PULSES(mleft_abs)), (int)roundf(TRACTION_MR_REV2PULSES(mright_abs)), traction_handle);
+        motor_pair_set_speed((int)roundf(TRACTION_CONV_REV2PULSES(mleft_abs)), (int)roundf(TRACTION_CONV_REV2PULSES(mright_abs)), traction_handle);
     }
     else
     {

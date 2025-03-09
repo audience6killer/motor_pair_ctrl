@@ -13,19 +13,13 @@
 #include "traction_control.h"
 #include "traction_task_common.h"
 
-#define IN_VECINITY(x, setpoint) (abs(setpoint - x) <= 2 ? setpoint : x)
+#define IN_VECINITY(x, setpoint) (abs(setpoint - x) <= 30 ? setpoint : x)
 
 static const char TAG[] = "odometry_task";
 
 static QueueHandle_t odometry_queue_handle;
 static odometry_data_t g_vehicle_pose;
 static odometry_data_t g_vehicle_pose_past;
-static uint32_t g_reading_count = 0;
-
-int map(int x, int in_min, int in_max, int out_min, int out_max)
-{
-    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
-}
 
 esp_err_t odometry_send_msg2queue(odometry_data_t *data)
 {
@@ -43,13 +37,13 @@ static void odometry_update_pose_loop(void *args)
 {
     float phi_diff = g_vehicle_pose.phi_r - g_vehicle_pose.phi_l;
 
-    phi_diff = TRACTION_MR_PULSES2RAD(phi_diff);
+    phi_diff = TRACTION_CONV_PULSES2RAD(phi_diff);
 
     float delta_phi_r = g_vehicle_pose.phi_r - g_vehicle_pose_past.phi_r;
     float delta_phi_l = g_vehicle_pose.phi_l - g_vehicle_pose_past.phi_l;
 
     float phi_sum = delta_phi_l + delta_phi_r;
-    phi_sum = TRACTION_MR_PULSES2RAD(phi_sum);
+    phi_sum = TRACTION_CONV_PULSES2RAD(phi_sum);
 
     // Update N-1 pose
     g_vehicle_pose_past.phi_l = g_vehicle_pose.phi_l;
@@ -73,12 +67,8 @@ esp_err_t odometry_calculate_pose(motor_pair_data_t r_data)
     delta_phi_l = IN_VECINITY(delta_phi_l, r_data.mleft_set_point);
     delta_phi_r = IN_VECINITY(delta_phi_r, r_data.mright_set_point);
 
-    int phi_l_in_r = map(delta_phi_l,
-                         -TRACTION_ML_MAX_PULSES, TRACTION_ML_MAX_PULSES,
-                         -TRACTION_MR_MAX_PULSES, TRACTION_MR_MAX_PULSES);
-
     // Update vehicle's wheel angle. Rolling average
-    g_vehicle_pose.phi_l += phi_l_in_r;
+    g_vehicle_pose.phi_l += delta_phi_l;
     g_vehicle_pose.phi_r += delta_phi_r;
 
     return ESP_OK;
@@ -128,8 +118,9 @@ static void odometry_unit_task(void *pvParameters)
         {
             ESP_ERROR_CHECK(odometry_calculate_pose(traction_data));
 
-#if false 
-            printf("/*left_setpoint,%d,speed_left,%d,right_setpoint,%d,speed_right,%d,state,%d,x,%.3f,y,%.3f,theta,%.3f*/\r\n", traction_data.mleft_set_point, traction_data.mleft_real_pulses, traction_data.mright_set_point, traction_data.mright_real_pulses, traction_data.state, g_vehicle_pose.x, g_vehicle_pose.y, g_vehicle_pose.theta);
+#if true 
+            printf("/*phi_l,%.4f,phi_r,%.4f,x,%.4f,y,%.4f*/\r\n", g_vehicle_pose.phi_l, g_vehicle_pose.phi_r, g_vehicle_pose.x, g_vehicle_pose.y);
+            //printf("/*left_setpoint,%d,speed_left,%d,right_setpoint,%d,speed_right,%d,state,%d,x,%.3f,y,%.3f,theta,%.3f*/\r\n", traction_data.mleft_set_point, traction_data.mleft_real_pulses, traction_data.mright_set_point, traction_data.mright_real_pulses, traction_data.state, g_vehicle_pose.x, g_vehicle_pose.y, g_vehicle_pose.theta);
 #endif
         }
         else
@@ -137,7 +128,7 @@ static void odometry_unit_task(void *pvParameters)
             ESP_LOGE(TAG, "Error receiving the queue");
         }
 
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(pdMS_TO_TICKS(1));
     }
 }
 
