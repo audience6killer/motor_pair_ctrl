@@ -72,7 +72,6 @@ static void traction_pid_loop_cb(void *args)
             ESP_LOGI(TAG, "TRACTION_CONTROL_STATE: BREAK");
             break;
         case COAST:
-            // TODO: Reset or not the desired speeds?
             ESP_ERROR_CHECK(bdc_motor_coast(traction_handle->motor_left_ctx.motor));
             ESP_ERROR_CHECK(bdc_motor_coast(traction_handle->motor_right_ctx.motor));
             ESP_LOGI(TAG, "TRACTION_CONTROL_STATE: COAST");
@@ -171,17 +170,16 @@ static void traction_pid_loop_cb(void *args)
         traction_data.mright_set_point = traction_handle->motor_right_ctx.desired_speed;
 
     // Send new data to queue
-    //uint64_t start = esp_timer_get_time();
+    // uint64_t start = esp_timer_get_time();
     if (xQueueSend(traction_queue_handle, &traction_data, portMAX_DELAY) != pdPASS)
     {
         ESP_LOGE(TAG, "Error sending data to queue");
     }
 
-    //uint64_t end = esp_timer_get_time();
-
-    //const unsigned int MEASUREMENTS = 500;
-    //printf("%u iterations took %llu milliseconds (%llu microseconds per invocation)\n",
-    //       MEASUREMENTS, (end - start) / 1000, (end - start) / MEASUREMENTS);
+    // uint64_t end = esp_timer_get_time();
+    // const unsigned int MEASUREMENTS = 500;
+    // printf("%u iterations took %llu milliseconds (%llu microseconds per invocation)\n",
+    //        MEASUREMENTS, (end - start) / 1000, (end - start) / MEASUREMENTS);
 }
 
 esp_err_t traction_control_set_direction(const motor_pair_state_e state)
@@ -196,7 +194,7 @@ esp_err_t traction_control_speed_controlled_direction(float motor_left_speed, fl
     float mleft_abs = fabs(motor_left_speed);
     float mright_abs = fabs(motor_right_speed);
 
-    //printf("mleft_abs: %f, mright_abs: %f\n", mleft_abs, mright_abs);
+    // printf("mleft_abs: %f, mright_abs: %f\n", mleft_abs, mright_abs);
 
     if (mleft_abs <= TRACTION_MOTOR_MAX_REVS && mright_abs <= TRACTION_MOTOR_MAX_REVS)
     {
@@ -211,7 +209,6 @@ esp_err_t traction_control_speed_controlled_direction(float motor_left_speed, fl
         else
             traction_control_set_direction(BRAKE);
 
-        // motor_pair_add_speed_to_queue(motor_left_abs, motor_right_abs, traction_handle);
         motor_pair_set_speed((int)roundf(TRACTION_CONV_REV2PULSES(mleft_abs)), (int)roundf(TRACTION_CONV_REV2PULSES(mright_abs)), traction_handle);
     }
     else
@@ -283,7 +280,7 @@ static void traction_control_task(void *pvParameters)
     // Enable motors
     ESP_ERROR_CHECK(motor_pair_enable_motors(traction_handle));
 
-    // Intinialize traction_data
+    // Initialize traction_data
     traction_data = (motor_pair_data_t){
         .state = STOPPED,
         .mleft_real_pulses = 0.0f,
@@ -304,7 +301,7 @@ static void traction_control_task(void *pvParameters)
 
     for (;;)
     {
-        vTaskDelay(pdMS_TO_TICKS(100));
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
 

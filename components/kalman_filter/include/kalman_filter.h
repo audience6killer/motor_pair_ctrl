@@ -5,8 +5,13 @@ typedef struct
 {
     float x;
     float y;
+    float z;
     float theta;
-} navigation_point_t;
+    float x_p;
+    float y_p;
+    float z_p;
+    float theta_p;
+} kalman_info_t;
 
 QueueHandle_t kalman_fiter_get_queue(void);
 

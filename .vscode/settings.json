@@ -27,7 +27,15 @@
         "memory": "c",
         "new": "c",
         "functional": "c",
-        "differential_drive_ctrl_task_common.h": "c"
+        "differential_drive_ctrl_task_common.h": "c",
+        "charconv": "c",
+        "condition_variable": "c",
+        "list": "c",
+        "optional": "c",
+        "future": "c",
+        "mutex": "c",
+        "regex": "c",
+        "*.inc": "c"
     },
     "idf.flashType": "UART",
     "idf.pythonInstallPath": "/usr/bin/python3"

@@ -14,8 +14,8 @@
 
 // Velocidad lineal de crucero = 0.5m/s = 0.388rev/s = 2.437rad/s
 #define V_COMM                         2.437f 
-#define V_MAX                          4 * M_PI    // 2 rev/s: Motor DER
-#define V_MAX_RADS                     4 * M_PI    // M_der MAX = 2 rev/s
+// Velocidad lineal maxima = 0.6m/s = 0.465rev/s = 2.91rad/s
+#define V_MAX_RADS                     2.925f   
 #define WHEEL_RADIUS                   0.2046f
 #define DISTANCE_TH                    0.30f        // 5 cm
 

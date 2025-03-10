@@ -21,6 +21,44 @@ static QueueHandle_t odometry_queue_handle;
 static odometry_data_t g_vehicle_pose;
 static odometry_data_t g_vehicle_pose_past;
 
+esp_err_t initialize_odometry_data(odometry_data_t *data)
+{
+    ESP_RETURN_ON_FALSE(data != NULL, ESP_ERR_INVALID_STATE, TAG, "Null data to initialize");
+
+    data->x.cur_value = 0.0f;
+    data->y.cur_value = 0.0f;
+    data->phi_l.cur_value = 0.0f;
+    data->phi_r.cur_value = 0.0f;
+    data->theta.cur_value = 0.0f;
+
+    data->x.past_value = 0.0f;
+    data->y.past_value = 0.0f;
+    data->phi_l.past_value = 0.0f;
+    data->phi_r.past_value = 0.0f;
+    data->theta.past_value = 0.0f;
+
+    data->x.diff_value = 0.0f;
+    data->y.diff_value = 0.0f;
+    data->phi_l.diff_value = 0.0f;
+    data->phi_r.diff_value = 0.0f;
+    data->theta.diff_value = 0.0f;
+
+    return ESP_OK;
+}
+
+esp_err_t calculate_diffential(odometry_data_t *data)
+{
+    ESP_RETURN_ON_FALSE(data != NULL, ESP_ERR_INVALID_STATE, TAG, "Null data to calculate diffential");
+
+    data->x.diff_value = (data->x.cur_value - data->x.past_value) / 10E-2;
+    data->y.diff_value = (data->y.cur_value - data->y.past_value) / 10E-2;
+    data->phi_l.diff_value = (data->phi_l.cur_value - data->phi_l.past_value) / 10E-2;
+    data->phi_r.diff_value = (data->phi_r.cur_value - data->phi_r.past_value) / 10E-2;
+    data->theta.diff_value = (data->theta.cur_value - data->theta.past_value) / 10E-2;
+
+    return ESP_OK;
+}
+
 esp_err_t odometry_send_msg2queue(odometry_data_t *data)
 {
     ESP_RETURN_ON_FALSE(data != NULL, ESP_ERR_INVALID_STATE, TAG, "Null data to send to queue");
@@ -35,27 +73,29 @@ esp_err_t odometry_send_msg2queue(odometry_data_t *data)
 
 static void odometry_update_pose_loop(void *args)
 {
-    float phi_diff = g_vehicle_pose.phi_r - g_vehicle_pose.phi_l;
+    float phi_diff = g_vehicle_pose.phi_r.cur_value - g_vehicle_pose.phi_l.cur_value;
 
     phi_diff = TRACTION_CONV_PULSES2RAD(phi_diff);
 
-    float delta_phi_r = g_vehicle_pose.phi_r - g_vehicle_pose_past.phi_r;
-    float delta_phi_l = g_vehicle_pose.phi_l - g_vehicle_pose_past.phi_l;
+    float delta_phi_r = g_vehicle_pose.phi_r.cur_value - g_vehicle_pose.phi_r.past_value;
+    float delta_phi_l = g_vehicle_pose.phi_l.cur_value - g_vehicle_pose.phi_l.past_value;
 
     float phi_sum = delta_phi_l + delta_phi_r;
     phi_sum = TRACTION_CONV_PULSES2RAD(phi_sum);
 
     // Update N-1 pose
-    g_vehicle_pose_past.phi_l = g_vehicle_pose.phi_l;
-    g_vehicle_pose_past.phi_r = g_vehicle_pose.phi_r;
+    g_vehicle_pose.phi_l.past_value = g_vehicle_pose.phi_l.cur_value;
+    g_vehicle_pose.phi_r.past_value = g_vehicle_pose.phi_r.cur_value;
 
     // Update pose parameters
-    g_vehicle_pose.theta = WHEEL_RADIUS * phi_diff / (2 * WHEEL_DISTANCE_TO_CM);
-    g_vehicle_pose.x = g_vehicle_pose.x + WHEEL_RADIUS * (phi_sum / 2) * cos(g_vehicle_pose.theta);
-    g_vehicle_pose.y = g_vehicle_pose.y + WHEEL_RADIUS * (phi_sum / 2) * sin(g_vehicle_pose.theta);
+    g_vehicle_pose.theta.past_value = g_vehicle_pose.theta.cur_value;
+    g_vehicle_pose.theta.cur_value = WHEEL_RADIUS * phi_diff / (2 * WHEEL_DISTANCE_TO_CM);
+    g_vehicle_pose.x.cur_value += WHEEL_RADIUS * (phi_sum / 2) * cos(g_vehicle_pose.theta.cur_value);
+    g_vehicle_pose.y.cur_value += WHEEL_RADIUS * (phi_sum / 2) * sin(g_vehicle_pose.theta.cur_value);
+
+    ESP_ERROR_CHECK(calculate_diffential(&g_vehicle_pose));
 
     ESP_ERROR_CHECK(odometry_send_msg2queue(&g_vehicle_pose));
-
 }
 
 esp_err_t odometry_calculate_pose(motor_pair_data_t r_data)
@@ -68,8 +108,8 @@ esp_err_t odometry_calculate_pose(motor_pair_data_t r_data)
     delta_phi_r = IN_VECINITY(delta_phi_r, r_data.mright_set_point);
 
     // Update vehicle's wheel angle. Rolling average
-    g_vehicle_pose.phi_l += delta_phi_l;
-    g_vehicle_pose.phi_r += delta_phi_r;
+    g_vehicle_pose.phi_l.cur_value += delta_phi_l;
+    g_vehicle_pose.phi_r.cur_value += delta_phi_r;
 
     return ESP_OK;
 }
@@ -80,22 +120,7 @@ static void odometry_unit_task(void *pvParameters)
 
     motor_pair_data_t traction_data;
 
-    g_vehicle_pose = (odometry_data_t){
-        .x = 0.0f,
-        .y = 0.0f,
-        .theta = 0.0f,
-        .phi_l = 0.0f,
-        .phi_r = 0.0f,
-        .odometry_state = ODO_STOPPED
-    };
-
-    g_vehicle_pose_past = (odometry_data_t){
-        .x = 0.0f,
-        .y = 0.0f,
-        .theta = 0.0f,
-        .phi_l = 0.0f,
-        .phi_r = 0.0f,
-    };
+    initialize_odometry_data(&g_vehicle_pose);
 
     esp_timer_create_args_t odometry_timer_args = {
         .callback = odometry_update_pose_loop,
@@ -118,7 +143,7 @@ static void odometry_unit_task(void *pvParameters)
         {
             ESP_ERROR_CHECK(odometry_calculate_pose(traction_data));
 
-#if true 
+#if false 
             printf("/*phi_l,%.4f,phi_r,%.4f,x,%.4f,y,%.4f*/\r\n", g_vehicle_pose.phi_l, g_vehicle_pose.phi_r, g_vehicle_pose.x, g_vehicle_pose.y);
             //printf("/*left_setpoint,%d,speed_left,%d,right_setpoint,%d,speed_right,%d,state,%d,x,%.3f,y,%.3f,theta,%.3f*/\r\n", traction_data.mleft_set_point, traction_data.mleft_real_pulses, traction_data.mright_set_point, traction_data.mright_real_pulses, traction_data.state, g_vehicle_pose.x, g_vehicle_pose.y, g_vehicle_pose.theta);
 #endif

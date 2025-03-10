@@ -10,12 +10,20 @@ typedef enum {
     ODO_READING
 } odometry_state_e;
 
+typedef struct 
+{
+    float past_value;
+    float cur_value;
+    float diff_value;
+} differentiator_t;
+
+
 typedef struct {
-    float x;
-    float y;
-    float phi_l;
-    float phi_r;
-    float theta; // In degrees
+    differentiator_t x;
+    differentiator_t y;
+    differentiator_t phi_l;
+    differentiator_t phi_r;
+    differentiator_t theta;
     odometry_state_e odometry_state;
 } odometry_data_t;
 

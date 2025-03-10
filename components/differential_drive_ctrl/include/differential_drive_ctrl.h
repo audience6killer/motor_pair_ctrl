@@ -8,16 +8,24 @@ typedef struct
 {
     pid_ctrl_block_handle_t position_pid_ctrl;
     pid_ctrl_block_handle_t orientation_pid_ctrl;
-    float vel_l; // rad/s -> rev/s
+    float vel_l;                // rad/s -> rev/s
     float vel_r;
 } diff_drive_ctrl_handle_t;
-
 
 typedef enum {
     POINT_REACHED,
     ORIENTING,
     NAVIGATING
 } diff_drive_state_t;
+
+typedef struct
+{
+    float x;
+    float y;
+    float theta;
+
+    diff_drive_state_t state;
+} navigation_point_t;
 
 QueueHandle_t diff_drive_get_queue_handle(void);
 
