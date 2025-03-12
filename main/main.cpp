@@ -23,7 +23,7 @@ extern "C" void app_main(void)
     odometry_unit_start_task();
     kalman_filter_start_task();
     diff_drive_ctrl_task_start();
-    waypoint_controller_start_task();
+    waypoint_ctrl_start_task();
 
     test_waypoint_follower_task_start();
     // seed_planter_control_start_task();

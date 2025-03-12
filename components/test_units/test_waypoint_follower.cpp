@@ -21,15 +21,15 @@ void start_test_waypoint_follower(void)
 {
     ESP_LOGI(TAG, "Starting test_waypoin_task");
 
-    ESP_ERROR_CHECK(waypoint_controller_start_trajectory());
+    ESP_ERROR_CHECK(waypoint_ctrl_start_trajectory());
 }
 
 static void test_waypoint_task(void *pvParemeters)
 {
     ESP_LOGI(TAG, "Configuring waypoints for test");
 
-    ESP_ERROR_CHECK(waypoint_controller_add_point(0.0f, 0.0f, 3.1516f));
-    ESP_ERROR_CHECK(waypoint_controller_add_point(10.0f, 0.0f, 0.0f));
+    // ESP_ERROR_CHECK(waypoint_controller_add_point(0.0f, 0.0f, 3.1516f));
+    ESP_ERROR_CHECK(waypoint_ctrl_add_point(10.0f, 0.0f, 0.0f));
 
     ESP_LOGI(TAG, "Waiting for start signal");
 
