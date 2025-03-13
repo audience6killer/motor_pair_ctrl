@@ -2,9 +2,6 @@
 
 extern "C"
 {
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/queue.h"
 #include "esp_log.h"
 #include "esp_check.h"
 
@@ -21,6 +18,14 @@ static QueueHandle_t g_waypoint_queue_handle = NULL;
 static std::queue<navigation_point_t> g_navigation_points;
 static waypoint_ctrl_state_e g_waypoint_state = WP_STOPPED;
 static esp_timer_handle_t g_next_point_timer;
+
+esp_err_t waypoint_ctrl_get_queue_handle(QueueHandle_t *handle)
+{
+    ESP_RETURN_ON_FALSE(g_waypoint_queue_handle != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue not initialized");
+
+    *handle = g_waypoint_queue_handle;
+    return ESP_OK;
+}
 
 esp_err_t waypoint_ctrl_send2queue(waypoint_ctrl_state_e state)
 {

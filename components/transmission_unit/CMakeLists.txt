@@ -1,3 +1,3 @@
-idf_component_register(SRCS "communicationRF.c" "data_center.c"
+idf_component_register(SRCS "data_center.cpp" "lora_rf_unit.c"
                     INCLUDE_DIRS "include"
-                    REQUIRES driver)
+                    REQUIRES kalman_filter traction_control state_machine)

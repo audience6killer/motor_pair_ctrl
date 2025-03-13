@@ -17,7 +17,7 @@
 #define RF_UART_CTS_PIN             UART_PIN_NO_CHANGE
 #define RF_UART_BAUDRATE_RF         115200
 #define RF_UART_DATA_BITS           UART_DATA_8_BITS
-#define RF_DATA_LENGTH              60     // In bytes
+#define RF_DATA_LENGTH              200     // In bytes
 #define RF_AUX_PIN                  GPIO_NUM_33
 
 #define WAIT_QUEUE_SEND_RF          100

@@ -1,31 +1,29 @@
 #ifndef DATA_CENTER_H
 #define DATA_CENTER_H
 
-typedef struct 
+#ifdef __cplusplus
+extern "C"
 {
-    // TODO: Maybe in NED and geodesic coordinates
-    // Position
-    float x;
-    float y;
-    float z;
-    // Speed
-    float x_p;
-    float y_p;
-    float z_p;
-    // Orientation
-    float theta;
-    float phi;
-    float gamma;
-    float theta_p;
-} date_frame_t;
+#endif
 
 typedef enum {
-    NAV_POINT = 0,
-    START_TRAJECTORY,
-    STOP_TRAJECTORY,
+    STOPPED_TX = 0,
+    SENDING 
+} data_center_status_e;
 
-} inst_code_e;
+/**
+ * @brief Start sending data to the RF module.
+ * 
+ * @return esp_err_t 
+ */
+esp_err_t data_center_start_sending(void);
 
+/**
+ * @brief Stop sending data to the RF module.
+ * 
+ * @return esp_err_t 
+ */
+esp_err_t data_center_stop_sending(void);
 
 /**
  * @brief Data center task initialization. 
@@ -33,5 +31,8 @@ typedef enum {
  */
 void data_center_task_start(void);
 
+#ifdef __cplusplus
+}   // extern "C"
+#endif
 
 #endif

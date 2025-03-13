@@ -35,7 +35,9 @@
         "future": "c",
         "mutex": "c",
         "regex": "c",
-        "*.inc": "c"
+        "*.inc": "c",
+        "kalman_filter.h": "c",
+        "motor_pair_ctrl.h": "c"
     },
     "idf.flashType": "UART",
     "idf.pythonInstallPath": "/usr/bin/python3"

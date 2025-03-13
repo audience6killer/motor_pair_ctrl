@@ -91,6 +91,13 @@ typedef struct
 } motor_pair_data_t;
 
 /**
+ * @brief Initialize motor pair unit
+ * 
+ * @param data 
+ */
+void motor_pair_init_data(motor_pair_data_t *data);
+
+/**
  * @brief
  *
  * @param tf final time, in samples @10ms

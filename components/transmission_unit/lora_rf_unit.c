@@ -8,8 +8,8 @@
 #include "esp_log.h"
 #include <string.h>
 
-#include "communicationRF.h"
-#include "communicationRF_task_common.h"
+#include "lora_rf_task_common.h"
+#include "lora_rf_unit.h"
 
 static QueueHandle_t communication_RF_queue = NULL; 
 static QueueHandle_t g_queue_data2send = NULL;

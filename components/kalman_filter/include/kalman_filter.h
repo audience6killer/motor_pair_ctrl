@@ -13,6 +13,8 @@ typedef struct
     float theta_p;
 } kalman_info_t;
 
+esp_err_t kalman_initialize_info(kalman_info_t *data);
+
 QueueHandle_t kalman_fiter_get_queue(void);
 
 void kalman_filter_start_task(void);
