@@ -24,14 +24,6 @@
 esp_err_t traction_control_set_direction(const motor_pair_state_e state);
 
 /**
- * @brief Set the speed in pulses for both motors. 
- * @param motor_left_speed in rad/s
- * @param motor_right_speed in rad/s 
- * @return esp_err_t
- */
-esp_err_t traction_control_set_speed(float motor_left_speed, float motor_right_speed);
-
-/**
  * @brief The speed can be positive or negative. The funcion will handle the change of spin direction of
  * the wheels
  * 
@@ -63,7 +55,7 @@ bool traction_control_is_busy(void);
  * 
  * @return QueueHandle_t 
  */
-QueueHandle_t traction_control_get_queue_handle(void);
+esp_err_t traction_control_get_queue_handle(QueueHandle_t *queue);
 
 /**
  * @brief Traction control task start

@@ -108,7 +108,8 @@ static void waypoint_ctrl_task(void *pvParameters)
         .arg = &diff_drive_state,
         .dispatch_method = ESP_TIMER_TASK,
         .name = "next_point_timer",
-        .skip_unhandled_events = false};
+        .skip_unhandled_events = false
+    };
 
     ESP_ERROR_CHECK(esp_timer_create(&next_point_timer_args, &g_next_point_timer));
 
@@ -127,7 +128,6 @@ static void waypoint_ctrl_task(void *pvParameters)
                         ESP_ERROR_CHECK(waypoint_ctrl_send2queue(WP_WAITING));
                     }
                 }
-                // ESP_ERROR_CHECK(waypoint_ctrl_trajectory_ctrl(diff_drive_state));
             }
         }
         vTaskDelay(pdMS_TO_TICKS(10));

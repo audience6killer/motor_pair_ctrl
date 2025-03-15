@@ -30,13 +30,13 @@ static const char TAG[] = "motor_pair";
 void motor_pair_init_data(motor_pair_data_t *data)
 {
     data->state = STOPPED;
-    data->mleft_real_pulses = 0.0f;
-    data->mright_real_pulses = 0.0f;
+    data->mleft_pulses = 0.0f;
+    data->mright_pulses = 0.0f;
     data->mleft_set_point = 0.0f;
     data->mright_set_point = 0.0f;
 }
 
-esp_err_t calculate_lspb_speed_point(const int tf, int t, const float qf, float *pvPoint)
+esp_err_t calc_lspb_speed_point(const int tf, int t, const float qf, float *pvPoint)
 {
     const float q0 = 0.0f;
     const float t0 = 0.0f;
@@ -73,7 +73,6 @@ esp_err_t calculate_lspb_speed_point(const int tf, int t, const float qf, float 
 
 esp_err_t motor_pair_set_speed(int motor_left_speed, int motor_right_speed, motor_pair_handle_t *motor_pair)
 {
-    //printf("motor_left_speed: %d, motor_right_speed: %d\n", motor_left_speed, motor_right_speed);
     motor_pair->motor_left_ctx.desired_speed = motor_left_speed;
     motor_pair->motor_right_ctx.desired_speed = motor_right_speed;
 

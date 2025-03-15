@@ -83,8 +83,8 @@ typedef enum
 
 typedef struct
 {
-    int mleft_real_pulses; // In pulses
-    int mright_real_pulses;
+    int mleft_pulses; // In pulses
+    int mright_pulses;
     int mleft_set_point;
     int mright_set_point;
     motor_pair_state_e state;
@@ -106,7 +106,7 @@ void motor_pair_init_data(motor_pair_data_t *data);
  * @param pvPoint
  * @return esp_err_t
  */
-esp_err_t calculate_lspb_speed_point(const int tf, int t, const float qf, float *pvPoint);
+esp_err_t calc_lspb_speed_point(const int tf, int t, const float qf, float *pvPoint);
 
 /**
  * @brief Set motors desiered speed. Speed can be positive or negative.
@@ -115,7 +115,6 @@ esp_err_t calculate_lspb_speed_point(const int tf, int t, const float qf, float 
  * @return esp_err_t
  */
 esp_err_t motor_pair_set_speed(int motor_left_speed, int motor_right_speed, motor_pair_handle_t *motor_pair);
-
 
 /**
  * @brief Enable motor pair: bdc and pcnt units

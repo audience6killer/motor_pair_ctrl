@@ -6,6 +6,7 @@
 #include "freertos/queue.h"
 #include "esp_timer.h"
 #include "esp_log.h"
+#include "esp_check.h"
 #include "stdbool.h"
 #include "string.h"
 
@@ -35,8 +36,6 @@ static void traction_pid_loop_cb(void *args)
     static motor_pair_state_e last_traction_state = STOPPED;
     static int soft_start_counter = 0;
 
-    // const unsigned int MEASUREMENTS = 500;
-
     // Calculate current speed
     int motor_left_cur_pulse_count = 0;
     int motor_right_cur_pulse_count = 0;
@@ -51,8 +50,8 @@ static void traction_pid_loop_cb(void *args)
     int motor_right_abs_pulses = abs(motor_right_real_pulses);
 
     // Save the real value of the speed
-    traction_data.mleft_real_pulses = motor_left_real_pulses;
-    traction_data.mright_real_pulses = motor_right_real_pulses;
+    traction_data.mleft_pulses = motor_left_real_pulses;
+    traction_data.mright_pulses = motor_right_real_pulses;
 
     motor_right_last_pulse_count = motor_right_cur_pulse_count;
     motor_left_last_pulse_count = motor_left_cur_pulse_count;
@@ -169,17 +168,10 @@ static void traction_pid_loop_cb(void *args)
     else
         traction_data.mright_set_point = traction_handle->motor_right_ctx.desired_speed;
 
-    // Send new data to queue
-    // uint64_t start = esp_timer_get_time();
     if (xQueueSend(traction_queue_handle, &traction_data, portMAX_DELAY) != pdPASS)
     {
         ESP_LOGE(TAG, "Error sending data to queue");
     }
-
-    // uint64_t end = esp_timer_get_time();
-    // const unsigned int MEASUREMENTS = 500;
-    // printf("%u iterations took %llu milliseconds (%llu microseconds per invocation)\n",
-    //        MEASUREMENTS, (end - start) / 1000, (end - start) / MEASUREMENTS);
 }
 
 esp_err_t traction_control_set_direction(const motor_pair_state_e state)
@@ -189,22 +181,22 @@ esp_err_t traction_control_set_direction(const motor_pair_state_e state)
     return ESP_OK;
 }
 
-esp_err_t traction_control_speed_controlled_direction(float motor_left_speed, float motor_right_speed)
+esp_err_t traction_control_speed_controlled_direction(float mleft_speed, float mright_speed)
 {
-    float mleft_abs = fabs(motor_left_speed);
-    float mright_abs = fabs(motor_right_speed);
+    float mleft_abs = fabs(mleft_speed);
+    float mright_abs = fabs(mright_speed);
 
     // printf("mleft_abs: %f, mright_abs: %f\n", mleft_abs, mright_abs);
 
-    if (mleft_abs <= TRACTION_MOTOR_MAX_REVS && mright_abs <= TRACTION_MOTOR_MAX_REVS)
+    if (mleft_abs <= TRACT_MOTOR_MAX_REVS && mright_abs <= TRACT_MOTOR_MAX_REVS)
     {
-        if (motor_left_speed < 0.0f && motor_right_speed < 0.0f)
+        if (mleft_speed < 0.0f && mright_speed < 0.0f)
             traction_control_set_direction(REVERSE);
-        else if (motor_left_speed < 0.0f && motor_right_speed >= 0.0f)
+        else if (mleft_speed < 0.0f && mright_speed >= 0.0f)
             traction_control_set_direction(TURN_LEFT_FORWARD);
-        else if (motor_left_speed >= 0.0f && motor_right_speed < 0.0f)
+        else if (mleft_speed >= 0.0f && mright_speed < 0.0f)
             traction_control_set_direction(TURN_RIGHT_FORWARD);
-        else if (motor_left_speed > 0.0f && motor_right_speed > 0.0f)
+        else if (mleft_speed > 0.0f && mright_speed > 0.0f)
             traction_control_set_direction(FORWARD);
         else
             traction_control_set_direction(BRAKE);
@@ -229,35 +221,35 @@ static void traction_control_task(void *pvParameters)
     // Configuration parameters
     motor_pair_config_t traction_control_config = {
         .motor_left_config = (motor_config_t){
-            .motor_encodera_gpio_num = TRACTION_MOTOR_LEFT_ENCODER_A,
-            .motor_encoderb_gpio_num = TRACTION_MOTOR_LEFT_ENCODER_B,
-            .motor_pwma_gpio_num = TRACTION_MOTOR_LEFT_PWMA,
-            .motor_pwmb_gpio_num = TRACTION_MOTOR_LEFT_PWMB,
-            .pwm_freq_hz = TRACTION_MOTORS_PWM_FREQ,
+            .motor_encodera_gpio_num = TRACT_ML_ENCODER_A,
+            .motor_encoderb_gpio_num = TRACT_ML_ENCODER_B,
+            .motor_pwma_gpio_num = TRACT_ML_PWMA,
+            .motor_pwmb_gpio_num = TRACT_ML_PWMB,
+            .pwm_freq_hz = TRACT_MOTORS_PWM_FREQ,
             .motor_id = "traction_left",
             .pid_config = {
-                .kp = TRACTION_MOTOR_LEFT_KP,
-                .kd = TRACTION_MOTOR_LEFT_KD,
-                .ki = TRACTION_MOTOR_LEFT_KI,
+                .kp = TRACT_ML_KP,
+                .kd = TRACT_ML_KD,
+                .ki = TRACT_ML_KI,
             },
         },
         .motor_right_config = (motor_config_t){
-            .motor_encodera_gpio_num = TRACTION_MOTOR_RIGHT_ENCODER_A,
-            .motor_encoderb_gpio_num = TRACTION_MOTOR_RIGHT_ENCODER_B,
-            .motor_pwma_gpio_num = TRACTION_MOTOR_RIGHT_PWMA,
-            .motor_pwmb_gpio_num = TRACTION_MOTOR_RIGHT_PWMB,
-            .pwm_freq_hz = TRACTION_MOTORS_PWM_FREQ,
+            .motor_encodera_gpio_num = TRACT_MR_ENCODER_A,
+            .motor_encoderb_gpio_num = TRACT_MR_ENCODER_B,
+            .motor_pwma_gpio_num = TRACT_MR_PWMA,
+            .motor_pwmb_gpio_num = TRACT_MR_PWMB,
+            .pwm_freq_hz = TRACT_MOTORS_PWM_FREQ,
             .motor_id = "traction_right",
             .pid_config = {
-                .kp = TRACTION_MOTOR_RIGHT_KP,
-                .kd = TRACTION_MOTOR_RIGHT_KD,
-                .ki = TRACTION_MOTOR_RIGHT_KI,
+                .kp = TRACT_MR_KP,
+                .kd = TRACT_MR_KD,
+                .ki = TRACT_MR_KI,
             },
         },
         .bdc_config = (motor_pair_bdc_config_t){
             .bdc_encoder_pcnt_high_limit = BDC_ENCODER_PCNT_HIGH_LIMIT,
             .bdc_encoder_pcnt_low_limit = BDC_ENCODER_PCNT_LOW_LIMIT,
-            .mcpwm_group = TRACTION_MOTORS_MCPWM_GROUP,
+            .mcpwm_group = TRACT_MOTORS_MCPWM_GROUP,
             .pid_loop_period = BDC_PID_LOOP_PERIOD_MS,
             .bdc_mcpwm_timer_resolution_hz = BDC_MCPWM_TIMER_RESOLUTION_HZ,
         },
@@ -283,8 +275,8 @@ static void traction_control_task(void *pvParameters)
     // Initialize traction_data
     traction_data = (motor_pair_data_t){
         .state = STOPPED,
-        .mleft_real_pulses = 0.0f,
-        .mright_real_pulses = 0.0f,
+        .mleft_pulses = 0.0f,
+        .mright_pulses = 0.0f,
         .mleft_set_point = 0.0f,
         .mright_set_point = 0.0f,
     };
@@ -307,8 +299,7 @@ static void traction_control_task(void *pvParameters)
 
 esp_err_t traction_control_soft_start(float target_speed, int tf)
 {
-    if (traction_handle == NULL)
-        return ESP_FAIL;
+    ESP_RETURN_ON_FALSE(traction_queue_handle != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue handle is NULL");
 
     ESP_LOGI(TAG, "Starting soft start");
     // g_soft_start_traction_active = true;
@@ -319,11 +310,15 @@ esp_err_t traction_control_soft_start(float target_speed, int tf)
     return ESP_OK;
 }
 
-QueueHandle_t traction_control_get_queue_handle(void)
+esp_err_t traction_control_get_queue_handle(QueueHandle_t *queue)
 {
-    return traction_queue_handle;
+    ESP_RETURN_ON_FALSE(traction_queue_handle != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue handle is NULL");
+
+    *queue = traction_queue_handle;
+    return ESP_OK;
 }
 
+// TODO: check if it is necessary to add a mutex (?)
 bool traction_control_is_busy(void)
 {
     return g_soft_start_traction_active;
@@ -335,9 +330,9 @@ void traction_control_start_task(void)
 
     xTaskCreatePinnedToCore(&traction_control_task,
                             "traction_control",
-                            TRACTION_CONTROL_STACK_SIZE,
+                            TRACT_CONTROL_STACK_SIZE,
                             NULL,
-                            TRACTION_CONTROL_TASK_PRIORITY,
+                            TRACT_CONTROL_TASK_PRIORITY,
                             NULL,
-                            TRACTION_CONTROL_CORE_ID);
+                            TRACT_CONTROL_CORE_ID);
 }
