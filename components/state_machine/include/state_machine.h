@@ -6,6 +6,21 @@ extern "C"
 {
 #endif
 
+    typedef enum {
+        CMD_START = 0,
+        CMD_STOP,
+        CMD_RESET,
+        CMD_PAUSE,
+        CMD_RESUME,
+        CMD_WAYPOINT,
+        CMD_ECHO,
+    } state_machine_cmd_e; // Commands sended from the state machine
+
+    typedef struct {
+        state_machine_cmd_e code;
+        float agrs[3];
+    } state_machine_msg_t;  
+
     /**
      * @brief Get queue handle 
      * 

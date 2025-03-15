@@ -11,9 +11,11 @@ extern "C"
 
     typedef enum {
         WP_STOPPED = 0,
+        WP_INIT,
+        WP_READY,
         WP_NAVIGATING,
         WP_WAITING,
-        WP_TRJ_FINISHED
+        WP_TRJ_FINISHED,
     } waypoint_ctrl_state_e;
 
     esp_err_t waypoint_ctrl_get_queue_handle(QueueHandle_t *handle);

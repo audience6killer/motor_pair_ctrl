@@ -29,6 +29,12 @@ typedef struct {
     float agrs[3];
 } data_center_msg_t;
 
+ // Task state
+typedef enum {
+    INIT = 0,
+    READY,
+} data_center_state_e; 
+
 /**
  * @brief Get the data center queue handle object. 
  * 
