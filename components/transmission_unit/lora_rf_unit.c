@@ -46,8 +46,7 @@ static void lora_receive_task(void *pvParameters)
         if (xQueueReceive(communication_RF_queue, (void *)&event_uart_rx, pdMS_TO_TICKS(100)) == pdTRUE)
         {
             // Clean buffer.
-            for(size_t i = 0; i < RF_UART_BUFFER_SIZE; i++)
-                data[i] = 0;
+            memset(data, 0, RF_UART_BUFFER_SIZE);
 
             switch (event_uart_rx.type)
             {

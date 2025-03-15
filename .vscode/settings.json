@@ -37,7 +37,8 @@
         "regex": "c",
         "*.inc": "c",
         "kalman_filter.h": "c",
-        "motor_pair_ctrl.h": "c"
+        "motor_pair_ctrl.h": "c",
+        "cstring": "cpp"
     },
     "idf.flashType": "UART",
     "idf.pythonInstallPath": "/usr/bin/python3"
