@@ -8,8 +8,8 @@
  * @copyright Copyright (c) 2024
  * 
  */
-#ifndef TRACTION_CONTROL_H_H
-#define TRACTION_CONTROL_H_H
+#ifndef TRACTION_CONTROL_H
+#define TRACTION_CONTROL_H
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"

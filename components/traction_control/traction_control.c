@@ -21,7 +21,7 @@
 static const char TAG[] = "traction_control";
 
 static motor_pair_handle_t *traction_handle = NULL;
-static QueueHandle_t traction_queue_handle;
+static QueueHandle_t g_traction_data_queue;
 static motor_pair_state_e g_traction_state = STOPPED;
 static motor_pair_data_t traction_data;
 
@@ -124,10 +124,10 @@ static void traction_pid_loop_cb(void *args)
         // float target_speed = (float)traction_handle->motor_left_ctx.desired_speed / TRACTION_M_LEFT_REV2PULSES;
         soft_start_counter++;
 
-        calculate_lspb_speed_point(g_soft_start_tf, soft_start_counter, g_soft_start_target_speed, &point);
+        calc_lspb_speed_point(g_soft_start_tf, soft_start_counter, g_soft_start_target_speed, &point);
         // traction_control_speed_controlled_direction(point, point);
-        motor_pair_set_speed((int)roundf(TRACTION_CONV_REV2PULSES(point)),
-                             (int)roundf(TRACTION_CONV_REV2PULSES(point)),
+        motor_pair_set_speed((int)roundf(TRACT_CONV_REV2PULSES(point)),
+                             (int)roundf(TRACT_CONV_REV2PULSES(point)),
                              traction_handle);
 
         // ESP_LOGI(TAG, "soft start point: %f", point);
@@ -168,7 +168,7 @@ static void traction_pid_loop_cb(void *args)
     else
         traction_data.mright_set_point = traction_handle->motor_right_ctx.desired_speed;
 
-    if (xQueueSend(traction_queue_handle, &traction_data, portMAX_DELAY) != pdPASS)
+    if (xQueueSend(g_traction_data_queue, &traction_data, portMAX_DELAY) != pdPASS)
     {
         ESP_LOGE(TAG, "Error sending data to queue");
     }
@@ -201,7 +201,7 @@ esp_err_t traction_control_speed_controlled_direction(float mleft_speed, float m
         else
             traction_control_set_direction(BRAKE);
 
-        motor_pair_set_speed((int)roundf(TRACTION_CONV_REV2PULSES(mleft_abs)), (int)roundf(TRACTION_CONV_REV2PULSES(mright_abs)), traction_handle);
+        motor_pair_set_speed((int)roundf(TRACT_CONV_REV2PULSES(mleft_abs)), (int)roundf(TRACT_CONV_REV2PULSES(mright_abs)), traction_handle);
     }
     else
     {
@@ -285,7 +285,7 @@ static void traction_control_task(void *pvParameters)
     float initial_speed = 0.0f;
     traction_control_speed_controlled_direction(initial_speed, initial_speed);
     // Setting up queue
-    traction_queue_handle = xQueueCreate(4, sizeof(motor_pair_data_t));
+    g_traction_data_queue = xQueueCreate(4, sizeof(motor_pair_data_t));
 
     // Starting pid loop
     ESP_LOGI(TAG, "Starting motor speed loop");
@@ -299,7 +299,7 @@ static void traction_control_task(void *pvParameters)
 
 esp_err_t traction_control_soft_start(float target_speed, int tf)
 {
-    ESP_RETURN_ON_FALSE(traction_queue_handle != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue handle is NULL");
+    ESP_RETURN_ON_FALSE(g_traction_data_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue handle is NULL");
 
     ESP_LOGI(TAG, "Starting soft start");
     // g_soft_start_traction_active = true;
@@ -312,9 +312,9 @@ esp_err_t traction_control_soft_start(float target_speed, int tf)
 
 esp_err_t traction_control_get_queue_handle(QueueHandle_t *queue)
 {
-    ESP_RETURN_ON_FALSE(traction_queue_handle != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue handle is NULL");
+    ESP_RETURN_ON_FALSE(g_traction_data_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue handle is NULL");
 
-    *queue = traction_queue_handle;
+    *queue = g_traction_data_queue;
     return ESP_OK;
 }
 

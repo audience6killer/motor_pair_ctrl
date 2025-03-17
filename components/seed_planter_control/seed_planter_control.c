@@ -48,8 +48,8 @@ static void seed_planter_pid_loop_cb(void *args)
     int seed_dispenser_abs_pulses = abs(seed_dispenser_real_pulses);
 
     // Save real pulse count
-    seed_planter_data.mleft_real_pulses = (cutter_disc_real_pulses) * CUTTER_DISC_PULSES2REV;
-    seed_planter_data.mright_real_pulses = (seed_dispenser_real_pulses) * SEED_DISPENSER_PULSES2REV;
+    seed_planter_data.mleft_pulses = (cutter_disc_real_pulses) * CUTTER_DISC_PULSES2REV;
+    seed_planter_data.mright_pulses = (seed_dispenser_real_pulses) * SEED_DISPENSER_PULSES2REV;
 
     seed_dispenser_last_pulse_count = seed_dispenser_cur_pulse_count;
     cutter_disc_last_pulse_count = cutter_disc_cur_pulse_count;
@@ -100,8 +100,8 @@ static void seed_planter_pid_loop_cb(void *args)
         float cutter_disc_point = 0.0f;
         float seed_dispenser_point = 0.0f;
 
-        calculate_lspb_speed_point(g_soft_start_tf, soft_start_counter, g_soft_start_cutter_disc_ts, &cutter_disc_point);
-        calculate_lspb_speed_point(g_soft_start_tf, soft_start_counter, g_soft_start_seed_dispenser_ts, &seed_dispenser_point);
+        calc_lspb_speed_point(g_soft_start_tf, soft_start_counter, g_soft_start_cutter_disc_ts, &cutter_disc_point);
+        calc_lspb_speed_point(g_soft_start_tf, soft_start_counter, g_soft_start_seed_dispenser_ts, &seed_dispenser_point);
 
         ESP_ERROR_CHECK(seed_planter_set_speed(cutter_disc_point, seed_dispenser_point));
 
@@ -237,8 +237,8 @@ static void seed_planter_control_task(void *pvParameters)
     // Initialize seed_planter_data
     seed_planter_data = (motor_pair_data_t){
         .state = STOPPED,
-        .mleft_real_pulses = 0,
-        .mright_real_pulses = 0,
+        .mleft_pulses = 0,
+        .mright_pulses = 0,
         .mleft_set_point = 0,
         .mright_set_point = 0,
     };

@@ -81,7 +81,7 @@ static void data_center_send_data(void *args)
     case KALMAN_AND_TRACTION_DATA:
         sprintf(frame, "/*%s,x,%.4f,y,%.4f,theta,%.4f,x_p,%.4f,y_p,%.4f,z_p,%.4f,theta_p,%.4f,mleft_real_pulses,%d,mright_real_pulses,%d,mleft_set_point,%d,mright_set_point,%d*/",
                 code, kalman_data.x, kalman_data.y, kalman_data.theta, kalman_data.x_p, kalman_data.y_p, kalman_data.z_p, kalman_data.theta_p,
-                traction_data.mleft_real_pulses, traction_data.mright_real_pulses, traction_data.mleft_set_point, traction_data.mright_set_point);
+                traction_data.mleft_pulses, traction_data.mright_pulses, traction_data.mleft_set_point, traction_data.mright_set_point);
         break;
 
     case KALMAN_DATA:
@@ -91,7 +91,7 @@ static void data_center_send_data(void *args)
 
     case TRACTION_DATA:
         sprintf(frame, "/*code,%s,mleft_real_pulses,%d,mright_real_pulses,%d,mleft_set_point,%d,mright_set_point,%d*/",
-                code, traction_data.mleft_real_pulses, traction_data.mright_real_pulses, traction_data.mleft_set_point, traction_data.mright_set_point);
+                code, traction_data.mleft_pulses, traction_data.mright_pulses, traction_data.mleft_set_point, traction_data.mright_set_point);
         break;
 
     case NONE:
@@ -260,7 +260,8 @@ static void data_center_send_task(void *args)
     ESP_LOGI(TAG, "Iniatiliazing data center sending task");
 
     // Data sources
-    QueueHandle_t traction_control_queue_pv = traction_control_get_queue_handle();
+    QueueHandle_t traction_control_queue_pv = NULL;
+    ESP_ERROR_CHECK( traction_control_get_queue_handle(&traction_control_queue_pv) );
     QueueHandle_t kalman_filter_queue_pv = kalman_fiter_get_queue();
 
     // LoRa queues

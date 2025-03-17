@@ -19,7 +19,6 @@ static const char TAG[] = "odometry_task";
 
 static QueueHandle_t odometry_queue_handle;
 static odometry_data_t g_vehicle_pose;
-static odometry_data_t g_vehicle_pose_past;
 
 esp_err_t initialize_odometry_data(odometry_data_t *data)
 {
@@ -75,13 +74,13 @@ static void odometry_update_pose_loop(void *args)
 {
     float phi_diff = g_vehicle_pose.phi_r.cur_value - g_vehicle_pose.phi_l.cur_value;
 
-    phi_diff = TRACTION_CONV_PULSES2RAD(phi_diff);
+    phi_diff = TRACT_CONV_PULSES2RAD(phi_diff);
 
     float delta_phi_r = g_vehicle_pose.phi_r.cur_value - g_vehicle_pose.phi_r.past_value;
     float delta_phi_l = g_vehicle_pose.phi_l.cur_value - g_vehicle_pose.phi_l.past_value;
 
     float phi_sum = delta_phi_l + delta_phi_r;
-    phi_sum = TRACTION_CONV_PULSES2RAD(phi_sum);
+    phi_sum = TRACT_CONV_PULSES2RAD(phi_sum);
 
     // Update N-1 pose
     g_vehicle_pose.phi_l.past_value = g_vehicle_pose.phi_l.cur_value;
@@ -100,8 +99,8 @@ static void odometry_update_pose_loop(void *args)
 
 esp_err_t odometry_calculate_pose(motor_pair_data_t r_data)
 {
-    int delta_phi_l = r_data.mleft_real_pulses;
-    int delta_phi_r = r_data.mright_real_pulses;
+    int delta_phi_l = r_data.mleft_pulses;
+    int delta_phi_r = r_data.mright_pulses;
 
     // Correct for angle
     delta_phi_l = IN_VECINITY(delta_phi_l, r_data.mleft_set_point);
@@ -116,7 +115,8 @@ esp_err_t odometry_calculate_pose(motor_pair_data_t r_data)
 
 static void odometry_unit_task(void *pvParameters)
 {
-    QueueHandle_t traction_control_queue = traction_control_get_queue_handle();
+    QueueHandle_t traction_control_queue = NULL;
+    ESP_ERROR_CHECK(traction_control_get_queue_handle(&traction_control_queue));
 
     motor_pair_data_t traction_data;
 
