@@ -18,16 +18,14 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #endif
 
-static const char TAG[] = "traction_control";
+static const char TAG[] = "tract_ctrl";
 
 static motor_pair_handle_t *traction_handle = NULL;
+static QueueHandle_t g_traction_cmd_queue = NULL;
 static QueueHandle_t g_traction_data_queue;
 static motor_pair_state_e g_traction_state = STOPPED;
 static motor_pair_data_t traction_data;
-
-static bool g_soft_start_traction_active = false;
-static float g_soft_start_target_speed = 0.0f;
-static int g_soft_start_tf = 0;
+static esp_timer_handle_t g_traction_pid_timer = NULL;
 
 static void traction_pid_loop_cb(void *args)
 {
@@ -68,74 +66,51 @@ static void traction_pid_loop_cb(void *args)
         case BRAKE:
             ESP_ERROR_CHECK(bdc_motor_brake(traction_handle->motor_left_ctx.motor));
             ESP_ERROR_CHECK(bdc_motor_brake(traction_handle->motor_right_ctx.motor));
-            ESP_LOGI(TAG, "TRACTION_CONTROL_STATE: BREAK");
+            ESP_LOGI(TAG, "tract_ctrl_STATE: BREAK");
             break;
         case COAST:
             ESP_ERROR_CHECK(bdc_motor_coast(traction_handle->motor_left_ctx.motor));
             ESP_ERROR_CHECK(bdc_motor_coast(traction_handle->motor_right_ctx.motor));
-            ESP_LOGI(TAG, "TRACTION_CONTROL_STATE: COAST");
+            ESP_LOGI(TAG, "tract_ctrl_STATE: COAST");
             break;
         case STARTING:
             ESP_ERROR_CHECK(bdc_motor_forward(traction_handle->motor_left_ctx.motor));
             ESP_ERROR_CHECK(bdc_motor_forward(traction_handle->motor_right_ctx.motor));
-            ESP_LOGI(TAG, "TRACTION_CONTROL_STATE: STARTING");
-            g_soft_start_traction_active = true;
+            ESP_LOGI(TAG, "tract_ctrl_STATE: STARTING");
             break;
         case FORWARD:
             ESP_ERROR_CHECK(bdc_motor_forward(traction_handle->motor_left_ctx.motor));
             ESP_ERROR_CHECK(bdc_motor_forward(traction_handle->motor_right_ctx.motor));
-            ESP_LOGI(TAG, "TRACTION_CONTROL_STATE: FORWARD");
+            ESP_LOGI(TAG, "tract_ctrl_STATE: FORWARD");
             break;
         case REVERSE:
             ESP_ERROR_CHECK(bdc_motor_reverse(traction_handle->motor_left_ctx.motor));
             ESP_ERROR_CHECK(bdc_motor_reverse(traction_handle->motor_right_ctx.motor));
-            ESP_LOGI(TAG, "TRACTION_CONTROL_STATE: REVERSE");
+            ESP_LOGI(TAG, "tract_ctrl_STATE: REVERSE");
             break;
         case TURN_LEFT_FORWARD:
             ESP_ERROR_CHECK(bdc_motor_reverse(traction_handle->motor_left_ctx.motor));
             ESP_ERROR_CHECK(bdc_motor_forward(traction_handle->motor_right_ctx.motor));
-            ESP_LOGI(TAG, "TRACTION_CONTROL_STATE: LEFT FORWARD");
+            ESP_LOGI(TAG, "tract_ctrl_STATE: LEFT FORWARD");
             break;
         case TURN_RIGHT_FORWARD:
             ESP_ERROR_CHECK(bdc_motor_forward(traction_handle->motor_left_ctx.motor));
             ESP_ERROR_CHECK(bdc_motor_reverse(traction_handle->motor_right_ctx.motor));
-            ESP_LOGI(TAG, "TRACTION_CONTROL_STATE: RIGHT FORWARD");
+            ESP_LOGI(TAG, "tract_ctrl_STATE: RIGHT FORWARD");
             break;
         case TURN_LEFT_REVERSE:
             ESP_ERROR_CHECK(bdc_motor_forward(traction_handle->motor_left_ctx.motor));
             ESP_ERROR_CHECK(bdc_motor_reverse(traction_handle->motor_right_ctx.motor));
-            ESP_LOGI(TAG, "TRACTION_CONTROL_STATE: LEFT REVERSE");
+            ESP_LOGI(TAG, "tract_ctrl_STATE: LEFT REVERSE");
             break;
         case TURN_RIGHT_REVERSE:
             ESP_ERROR_CHECK(bdc_motor_reverse(traction_handle->motor_left_ctx.motor));
             ESP_ERROR_CHECK(bdc_motor_forward(traction_handle->motor_right_ctx.motor));
-            ESP_LOGI(TAG, "TRACTION_CONTROL_STATE: RIGHT REVERSE");
+            ESP_LOGI(TAG, "tract_ctrl_STATE: RIGHT REVERSE");
             break;
         default:
-            ESP_LOGI(TAG, "TRACTION_CONTROL_STATE: ERRORRRRRRRRR");
+            ESP_LOGI(TAG, "tract_ctrl_STATE: ERRORRRRRRRRR");
             break;
-        }
-    }
-
-    if (g_soft_start_traction_active)
-    {
-        // During the soft start the queue will be ignored
-        float point = 0.0f;
-        // float target_speed = (float)traction_handle->motor_left_ctx.desired_speed / TRACTION_M_LEFT_REV2PULSES;
-        soft_start_counter++;
-
-        calc_lspb_speed_point(g_soft_start_tf, soft_start_counter, g_soft_start_target_speed, &point);
-        // traction_control_speed_controlled_direction(point, point);
-        motor_pair_set_speed((int)roundf(TRACT_CONV_REV2PULSES(point)),
-                             (int)roundf(TRACT_CONV_REV2PULSES(point)),
-                             traction_handle);
-
-        // ESP_LOGI(TAG, "soft start point: %f", point);
-        if (soft_start_counter == g_soft_start_tf)
-        {
-            soft_start_counter = 0;
-            g_soft_start_traction_active = false;
-            traction_control_set_direction(FORWARD);
         }
     }
 
@@ -174,15 +149,67 @@ static void traction_pid_loop_cb(void *args)
     }
 }
 
-esp_err_t traction_control_set_direction(const motor_pair_state_e state)
+esp_err_t tract_ctrl_set_direction(const motor_pair_state_e state)
 {
     // TODO: Some kind of verification might be necessary
     g_traction_state = state;
     return ESP_OK;
 }
 
-esp_err_t traction_control_speed_controlled_direction(float mleft_speed, float mright_speed)
+/**
+ * @brief Stop the PID loop and stopsthe motors
+ * 
+ * @return esp_err_t 
+ */
+esp_err_t tract_ctrl_stop_pid(void)
 {
+    ESP_RETURN_ON_FALSE(g_traction_pid_timer != NULL, ESP_ERR_INVALID_STATE, TAG, "PID timer is NULL");
+
+    if (!esp_timer_is_active(g_traction_pid_timer))
+    {
+        ESP_LOGW(TAG, "PID loop already stopped");
+        return ESP_OK;
+    }
+
+    float zero_speed = 0.0f;
+    tract_ctrl_speed_controlled_direction(&zero_speed, &zero_speed);
+    ESP_ERROR_CHECK(bdc_motor_brake(traction_handle->motor_left_ctx.motor));
+    ESP_ERROR_CHECK(bdc_motor_brake(traction_handle->motor_right_ctx.motor));
+
+    ESP_LOGI(TAG, "Stopping motor speed loop");
+    ESP_ERROR_CHECK(esp_timer_stop(g_traction_pid_timer));
+    return ESP_OK;
+}
+
+esp_err_t tract_ctrl_start_pid(void)
+{
+    ESP_RETURN_ON_FALSE(g_traction_pid_timer != NULL, ESP_ERR_INVALID_STATE, TAG, "PID timer is NULL");
+    // Starting pid loop
+    if (esp_timer_is_active(g_traction_pid_timer))
+    {
+        ESP_LOGW(TAG, "PID loop already started");
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Starting motor speed loop");
+    ESP_ERROR_CHECK(esp_timer_start_periodic(g_traction_pid_timer, BDC_PID_LOOP_PERIOD_MS * 1000));
+
+    return ESP_OK;
+}
+
+esp_err_t tract_ctrl_speed_controlled_direction(float *mleft_speed_pv, float *mright_speed_pv)
+{
+    ESP_RETURN_ON_FALSE(mleft_speed_pv != NULL, ESP_ERR_INVALID_ARG, TAG, "mleft_speed is NULL");
+    ESP_RETURN_ON_FALSE(mright_speed_pv != NULL, ESP_ERR_INVALID_ARG, TAG, "mright_speed is NULL");
+
+    if(!esp_timer_is_active(g_traction_pid_timer))
+    {
+        ESP_LOGE(TAG, "PID loop is not running");
+        return ESP_FAIL;
+    }
+
+    float mleft_speed = *mleft_speed_pv;
+    float mright_speed = *mright_speed_pv;
     float mleft_abs = fabs(mleft_speed);
     float mright_abs = fabs(mright_speed);
 
@@ -191,15 +218,15 @@ esp_err_t traction_control_speed_controlled_direction(float mleft_speed, float m
     if (mleft_abs <= TRACT_MOTOR_MAX_REVS && mright_abs <= TRACT_MOTOR_MAX_REVS)
     {
         if (mleft_speed < 0.0f && mright_speed < 0.0f)
-            traction_control_set_direction(REVERSE);
+            tract_ctrl_set_direction(REVERSE);
         else if (mleft_speed < 0.0f && mright_speed >= 0.0f)
-            traction_control_set_direction(TURN_LEFT_FORWARD);
+            tract_ctrl_set_direction(TURN_LEFT_FORWARD);
         else if (mleft_speed >= 0.0f && mright_speed < 0.0f)
-            traction_control_set_direction(TURN_RIGHT_FORWARD);
+            tract_ctrl_set_direction(TURN_RIGHT_FORWARD);
         else if (mleft_speed > 0.0f && mright_speed > 0.0f)
-            traction_control_set_direction(FORWARD);
+            tract_ctrl_set_direction(FORWARD);
         else
-            traction_control_set_direction(BRAKE);
+            tract_ctrl_set_direction(BRAKE);
 
         motor_pair_set_speed((int)roundf(TRACT_CONV_REV2PULSES(mleft_abs)), (int)roundf(TRACT_CONV_REV2PULSES(mright_abs)), traction_handle);
     }
@@ -212,14 +239,14 @@ esp_err_t traction_control_speed_controlled_direction(float mleft_speed, float m
     return ESP_OK;
 }
 
-static void traction_control_task(void *pvParameters)
+static void tract_ctrl_task(void *pvParameters)
 {
     // Initialize traction_handle
     traction_handle = (motor_pair_handle_t *)malloc(sizeof(motor_pair_handle_t));
-    strcpy(traction_handle->id, "traction_control_pair");
+    strcpy(traction_handle->id, "tract_ctrl_pair");
 
     // Configuration parameters
-    motor_pair_config_t traction_control_config = {
+    motor_pair_config_t tract_ctrl_config = {
         .motor_left_config = (motor_config_t){
             .motor_encodera_gpio_num = TRACT_ML_ENCODER_A,
             .motor_encoderb_gpio_num = TRACT_ML_ENCODER_B,
@@ -256,18 +283,16 @@ static void traction_control_task(void *pvParameters)
     };
 
     // Init motor pair unit
-    ESP_ERROR_CHECK(motor_pair_init(&traction_control_config, traction_handle));
+    ESP_ERROR_CHECK(motor_pair_init(&tract_ctrl_config, traction_handle));
 
     // Setting up timer
-    // motor_pair_data_t traction_data;
     const esp_timer_create_args_t traction_timer_args = {
         .callback = traction_pid_loop_cb,
         .arg = NULL,
         .name = "traction_pid_loop",
     };
 
-    esp_timer_handle_t traction_pid_loop_timer = NULL;
-    ESP_ERROR_CHECK(esp_timer_create(&traction_timer_args, &traction_pid_loop_timer));
+    ESP_ERROR_CHECK(esp_timer_create(&traction_timer_args, &g_traction_pid_timer));
 
     // Enable motors
     ESP_ERROR_CHECK(motor_pair_enable_motors(traction_handle));
@@ -283,34 +308,46 @@ static void traction_control_task(void *pvParameters)
 
     // Set initial speed
     float initial_speed = 0.0f;
-    traction_control_speed_controlled_direction(initial_speed, initial_speed);
+    tract_ctrl_speed_controlled_direction(&initial_speed, &initial_speed);
+
     // Setting up queue
     g_traction_data_queue = xQueueCreate(4, sizeof(motor_pair_data_t));
+    g_traction_cmd_queue = xQueueCreate(4, sizeof(tract_ctrl_cmd_t));
 
-    // Starting pid loop
-    ESP_LOGI(TAG, "Starting motor speed loop");
-    ESP_ERROR_CHECK(esp_timer_start_periodic(traction_pid_loop_timer, BDC_PID_LOOP_PERIOD_MS * 1000));
+    tract_ctrl_cmd_t tract_ctrl_cmd;
 
     for (;;)
     {
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        if (xQueueReceive(g_traction_cmd_queue, &tract_ctrl_cmd, portMAX_DELAY) == pdTRUE)
+        {
+            switch (tract_ctrl_cmd.cmd)
+            {
+            case TRACT_CTRL_CMD_STOP:
+                ESP_LOGI(TAG, "Stop command received");
+                tract_ctrl_stop_pid();
+                break;
+            case TRACT_CTRL_CMD_START:
+                ESP_LOGI(TAG, "Start command received");
+                tract_ctrl_start_pid();
+                break;
+            case TRACT_CTRL_CMD_SET_SPEED:
+                // ESP_LOGI(TAG, "Set speed controlled direction command received");
+                esp_err_t ret = tract_ctrl_speed_controlled_direction(tract_ctrl_cmd.motor_left_speed, tract_ctrl_cmd.motor_right_speed);
+                if(ret != ESP_OK)
+                {
+                    ESP_LOGE(TAG, "Error setting speed controlled direction");
+                }
+                break;
+            default:
+                ESP_LOGE(TAG, "Invalid command received");
+                break;
+            }
+        }
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
-esp_err_t traction_control_soft_start(float target_speed, int tf)
-{
-    ESP_RETURN_ON_FALSE(g_traction_data_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue handle is NULL");
-
-    ESP_LOGI(TAG, "Starting soft start");
-    // g_soft_start_traction_active = true;
-    traction_control_set_direction(STARTING);
-    g_soft_start_target_speed = target_speed;
-    g_soft_start_tf = tf;
-
-    return ESP_OK;
-}
-
-esp_err_t traction_control_get_queue_handle(QueueHandle_t *queue)
+esp_err_t tract_ctrl_get_data_queue(QueueHandle_t *queue)
 {
     ESP_RETURN_ON_FALSE(g_traction_data_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue handle is NULL");
 
@@ -318,18 +355,20 @@ esp_err_t traction_control_get_queue_handle(QueueHandle_t *queue)
     return ESP_OK;
 }
 
-// TODO: check if it is necessary to add a mutex (?)
-bool traction_control_is_busy(void)
+esp_err_t tract_ctrl_get_cmd_queue(QueueHandle_t *queue)
 {
-    return g_soft_start_traction_active;
+    ESP_RETURN_ON_FALSE(g_traction_cmd_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue handle is NULL");
+
+    *queue = g_traction_cmd_queue;
+    return ESP_OK;
 }
 
-void traction_control_start_task(void)
+void tract_ctrl_start_task(void)
 {
-    ESP_LOGI(TAG, "Initializing traction_control task");
+    ESP_LOGI(TAG, "Initializing tract_ctrl task");
 
-    xTaskCreatePinnedToCore(&traction_control_task,
-                            "traction_control",
+    xTaskCreatePinnedToCore(&tract_ctrl_task,
+                            "tract_ctrl",
                             TRACT_CONTROL_STACK_SIZE,
                             NULL,
                             TRACT_CONTROL_TASK_PRIORITY,
