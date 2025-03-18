@@ -16,6 +16,16 @@ typedef enum {
     POINT_REACHED,
     ORIENTING,
     NAVIGATING
+} diff_drive_state_e;
+
+typedef struct {
+    float err_x;
+    float err_y;
+    float err_theta;
+    float err_dist;
+    float err_ori;
+    
+    diff_drive_state_e state;
 } diff_drive_state_t;
 
 typedef struct
@@ -27,7 +37,7 @@ typedef struct
     diff_drive_state_t state;
 } navigation_point_t;
 
-QueueHandle_t diff_drive_get_queue_handle(void);
+esp_err_t diff_drive_get_queue_handle(QueueHandle_t *queue);
 
 esp_err_t diff_drive_set_navigation_point(navigation_point_t point);
 

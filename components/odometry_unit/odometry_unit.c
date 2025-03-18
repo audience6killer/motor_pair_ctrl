@@ -116,7 +116,11 @@ esp_err_t odometry_calculate_pose(motor_pair_data_t r_data)
 static void odometry_unit_task(void *pvParameters)
 {
     QueueHandle_t traction_control_queue = NULL;
-    ESP_ERROR_CHECK(traction_control_get_queue_handle(&traction_control_queue));
+    while(tract_ctrl_get_data_queue(&traction_control_queue) != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Error getting traction control queue. Retrying...");
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
 
     motor_pair_data_t traction_data;
 

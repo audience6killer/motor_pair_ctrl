@@ -27,12 +27,14 @@ static motor_pair_state_e g_traction_state = STOPPED;
 static motor_pair_data_t traction_data;
 static esp_timer_handle_t g_traction_pid_timer = NULL;
 
+
+esp_err_t tract_ctrl_speed_controlled_direction(float *mleft_speed_pv, float *mright_speed_pv);
+
 static void traction_pid_loop_cb(void *args)
 {
     static int motor_left_last_pulse_count = 0;
     static int motor_right_last_pulse_count = 0;
     static motor_pair_state_e last_traction_state = STOPPED;
-    static int soft_start_counter = 0;
 
     // Calculate current speed
     int motor_left_cur_pulse_count = 0;
@@ -158,8 +160,8 @@ esp_err_t tract_ctrl_set_direction(const motor_pair_state_e state)
 
 /**
  * @brief Stop the PID loop and stopsthe motors
- * 
- * @return esp_err_t 
+ *
+ * @return esp_err_t
  */
 esp_err_t tract_ctrl_stop_pid(void)
 {
@@ -175,6 +177,8 @@ esp_err_t tract_ctrl_stop_pid(void)
     tract_ctrl_speed_controlled_direction(&zero_speed, &zero_speed);
     ESP_ERROR_CHECK(bdc_motor_brake(traction_handle->motor_left_ctx.motor));
     ESP_ERROR_CHECK(bdc_motor_brake(traction_handle->motor_right_ctx.motor));
+    pid_reset_ctrl_block(traction_handle->motor_left_ctx.pid_ctrl);
+    pid_reset_ctrl_block(traction_handle->motor_right_ctx.pid_ctrl);
 
     ESP_LOGI(TAG, "Stopping motor speed loop");
     ESP_ERROR_CHECK(esp_timer_stop(g_traction_pid_timer));
@@ -202,7 +206,7 @@ esp_err_t tract_ctrl_speed_controlled_direction(float *mleft_speed_pv, float *mr
     ESP_RETURN_ON_FALSE(mleft_speed_pv != NULL, ESP_ERR_INVALID_ARG, TAG, "mleft_speed is NULL");
     ESP_RETURN_ON_FALSE(mright_speed_pv != NULL, ESP_ERR_INVALID_ARG, TAG, "mright_speed is NULL");
 
-    if(!esp_timer_is_active(g_traction_pid_timer))
+    if (!esp_timer_is_active(g_traction_pid_timer))
     {
         ESP_LOGE(TAG, "PID loop is not running");
         return ESP_FAIL;
@@ -318,22 +322,29 @@ static void tract_ctrl_task(void *pvParameters)
 
     for (;;)
     {
-        if (xQueueReceive(g_traction_cmd_queue, &tract_ctrl_cmd, portMAX_DELAY) == pdTRUE)
+        if (xQueueReceive(g_traction_cmd_queue, &tract_ctrl_cmd, pdMS_TO_TICKS(40)) == pdTRUE)
         {
             switch (tract_ctrl_cmd.cmd)
             {
             case TRACT_CTRL_CMD_STOP:
                 ESP_LOGI(TAG, "Stop command received");
-                tract_ctrl_stop_pid();
+                if(tract_ctrl_stop_pid() != ESP_OK)
+                {
+                    ESP_LOGE(TAG, "Error stopping PID loop");
+                }
                 break;
             case TRACT_CTRL_CMD_START:
                 ESP_LOGI(TAG, "Start command received");
-                tract_ctrl_start_pid();
+                if(tract_ctrl_start_pid() != ESP_OK)
+                {
+                    ESP_LOGE(TAG, "Error starting PID loop");
+
+                }
                 break;
             case TRACT_CTRL_CMD_SET_SPEED:
                 // ESP_LOGI(TAG, "Set speed controlled direction command received");
                 esp_err_t ret = tract_ctrl_speed_controlled_direction(tract_ctrl_cmd.motor_left_speed, tract_ctrl_cmd.motor_right_speed);
-                if(ret != ESP_OK)
+                if (ret != ESP_OK)
                 {
                     ESP_LOGE(TAG, "Error setting speed controlled direction");
                 }

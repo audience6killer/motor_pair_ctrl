@@ -10,7 +10,6 @@
 
 static const char TAG[] = "test_traction_control";
 
-static motor_pair_data_t traction_data;
 
 
 // Desired speed: 1.688rev/s @0.35m/s
@@ -19,7 +18,6 @@ static void test_traction_control_task(void *pvParameters)
     //const float target_speed = 0.850f;
     const float target_speed = 2.0f;
     const int tf = 500;
-    traction_control_soft_start(target_speed, tf);
 
     // traction_control_set_direction(REVERSE);
     //traction_control_set_speed(target_speed, target_speed);
