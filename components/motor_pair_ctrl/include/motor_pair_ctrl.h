@@ -81,6 +81,7 @@ typedef enum
     TURN_RIGHT_REVERSE,
     MP_BUSY,
     MP_READY,
+    MP_ERROR,
 } motor_pair_state_e;
 
 typedef struct

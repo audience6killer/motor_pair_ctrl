@@ -38,7 +38,9 @@
         "*.inc": "c",
         "kalman_filter.h": "c",
         "motor_pair_ctrl.h": "c",
-        "cstring": "cpp"
+        "cstring": "cpp",
+        "esp_event.h": "c",
+        "esp_event_base.h": "c"
     },
     "idf.flashType": "UART",
     "idf.pythonInstallPath": "/usr/bin/python3"

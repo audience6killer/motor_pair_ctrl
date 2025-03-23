@@ -13,6 +13,7 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
+#include "esp_event.h"
 #include "motor_pair_ctrl.h"
 
 typedef enum
@@ -37,17 +38,17 @@ typedef struct
 esp_err_t tract_ctrl_get_data_queue(QueueHandle_t *queue);
 
 /**
- * @brief Get the command queue for the traction control
- *
- * @param queue
- * @return esp_err_t
+ * @brief Get event loop reference
+ * 
+ * @param handle 
+ * @return esp_err_t 
  */
-esp_err_t tract_ctrl_get_cmd_queue(QueueHandle_t *queue);
+esp_err_t tract_ctrl_get_event_loop_handle(esp_event_loop_handle_t *handle);
 
 /**
  * @brief Starts task for traction control
  *
  */
-void tract_ctrl_start_task(void);
+void tract_ctrl_start_task(TaskHandle_t *parent);
 
 #endif
