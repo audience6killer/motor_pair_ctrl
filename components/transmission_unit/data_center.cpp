@@ -197,9 +197,9 @@ esp_err_t data_center_send2queue(data_center_msg_t *msg)
 esp_err_t data_center_parse_data(char *data)
 {
     char code[4];
-   
+
     // Check if the data is valid
-    if(strstr(data, "/*") == NULL || strstr(data, "*/") == NULL)
+    if (strstr(data, "/*") == NULL || strstr(data, "*/") == NULL)
     {
         ESP_LOGE(TAG, "Invalid data format");
         return ESP_FAIL;
@@ -257,12 +257,13 @@ static void data_center_receive_task(void *args)
 
 static void data_center_send_task(void *args)
 {
-    ESP_LOGI(TAG, "Iniatiliazing data center sending task");
+    ESP_LOGI(TAG, "Iniatiliazing sendig task");
 
     // Data sources
-    QueueHandle_t traction_control_queue_pv = NULL;
-    ESP_ERROR_CHECK( traction_control_get_queue_handle(&traction_control_queue_pv) );
-    QueueHandle_t kalman_filter_queue_pv = kalman_fiter_get_queue();
+    QueueHandle_t tract_ctrl_data_queue = NULL;
+    QueueHandle_t kalman_data_queue = NULL;
+    ESP_ERROR_CHECK(tract_ctrl_get_data_queue(&tract_ctrl_data_queue));
+    ESP_ERROR_CHECK(kalman_fiter_get_data_queue(&kalman_data_queue));
 
     // LoRa queues
     ESP_ERROR_CHECK(lora_get_queue_data2send(&g_lora_data2send_queue));
@@ -283,8 +284,8 @@ static void data_center_send_task(void *args)
     {
         if (g_data_center_send_status == SENDING)
         {
-            int traction_code = xQueueReceive(traction_control_queue_pv, &traction_data, pdMS_TO_TICKS(100));
-            int kalman_code = xQueueReceive(kalman_filter_queue_pv, &kalman_data, pdMS_TO_TICKS(100));
+            int traction_code = xQueueReceive(tract_ctrl_data_queue, &traction_data, pdMS_TO_TICKS(100));
+            int kalman_code = xQueueReceive(kalman_data_queue, &kalman_data, pdMS_TO_TICKS(100));
 
             if (traction_code == pdPASS && kalman_code == pdPASS)
             {

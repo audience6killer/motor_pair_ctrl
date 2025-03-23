@@ -15,7 +15,9 @@ typedef struct
 
 esp_err_t kalman_initialize_info(kalman_info_t *data);
 
-QueueHandle_t kalman_fiter_get_queue(void);
+esp_err_t kalman_fiter_get_data_queue(QueueHandle_t *handle);
+
+esp_err_t kalman_fiter_get_cmd_queue(QueueHandle_t *handle);
 
 void kalman_filter_start_task(void);
 

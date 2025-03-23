@@ -51,7 +51,7 @@ void waypoint_ctrl_trajectory_ctrl(void *args)
 {
     diff_drive_state_t state = *(diff_drive_state_t *)args;
 
-    if (state == POINT_REACHED)
+    if (state.state == POINT_REACHED)
     {
         if (g_navigation_points.size() > 0)
         {
@@ -98,7 +98,8 @@ static void waypoint_ctrl_task(void *pvParameters)
 
     g_waypoint_queue_handle = xQueueCreate(4, sizeof(navigation_point_t));
 
-    QueueHandle_t diff_drive_queue_pv = diff_drive_get_queue_handle();
+    QueueHandle_t diff_drive_queue_pv = NULL;
+    ESP_ERROR_CHECK(diff_drive_get_queue_handle(&diff_drive_queue_pv));
 
     diff_drive_state_t diff_drive_state;
 
@@ -119,7 +120,7 @@ static void waypoint_ctrl_task(void *pvParameters)
         {
             if (xQueueReceive(diff_drive_queue_pv, &diff_drive_state, portMAX_DELAY) == pdPASS)
             {
-                if (diff_drive_state == POINT_REACHED)
+                if (diff_drive_state.state == POINT_REACHED)
                 {
                     if (!esp_timer_is_active(g_next_point_timer))
                     {

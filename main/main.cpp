@@ -20,7 +20,7 @@ extern "C" void app_main(void)
     Serial.begin(115200);
 
     tract_ctrl_start_task();
-    odometry_unit_start_task();
+    odometry_start_task();
     kalman_filter_start_task();
     diff_drive_ctrl_task_start();
     waypoint_ctrl_start_task();

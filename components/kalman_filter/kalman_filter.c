@@ -10,7 +10,8 @@
 #include "odometry_unit.h"
 
 static const char TAG[] = "kalman_filter_task";
-static QueueHandle_t g_kalman_queue_handle = NULL;
+static QueueHandle_t g_kalman_data_queue = NULL;
+static QueueHandle_t g_kalman_cmd_queue = NULL;
 
 esp_err_t kalman_initialize_info(kalman_info_t *data)
 {
@@ -28,20 +29,30 @@ esp_err_t kalman_initialize_info(kalman_info_t *data)
     return ESP_OK;
 }
 
-QueueHandle_t kalman_fiter_get_queue(void)
+// TODO: Implement commands for task 
+esp_err_t kalman_fiter_get_cmd_queue(QueueHandle_t *handle)
 {
-    //ESP_RETURN_ON_FALSE(g_kalman_queue_handle != NULL, ESP_ERR_INVALID_STATE, TAG, "Retriving queue handle uniniatilized");
+    ESP_RETURN_ON_FALSE(g_kalman_cmd_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "Retriving queue handle uniniatilized");
 
-    return g_kalman_queue_handle;
+    *handle = g_kalman_cmd_queue;
+    return ESP_OK;
+}
+
+esp_err_t kalman_fiter_get_data_queue(QueueHandle_t *handle)
+{
+    ESP_RETURN_ON_FALSE(g_kalman_data_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "Retriving queue handle uniniatilized");
+
+    *handle = g_kalman_data_queue;
+    return ESP_OK;
 }
 
 esp_err_t kalman_send2queue(kalman_info_t *data)
 {
-    ESP_RETURN_ON_FALSE(g_kalman_queue_handle != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue handle is null");
+    ESP_RETURN_ON_FALSE(g_kalman_data_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue handle is null");
 
     ESP_RETURN_ON_FALSE(data != NULL, ESP_ERR_INVALID_STATE, TAG, "Null data to send to queue");
 
-    if (xQueueSend(g_kalman_queue_handle, data, portMAX_DELAY) != pdPASS)
+    if (xQueueSend(g_kalman_data_queue, data, portMAX_DELAY) != pdPASS)
     {
         ESP_LOGE(TAG, "Error sending queue");
     }
@@ -65,7 +76,7 @@ static void kalman_filter_task(void *pvParameters)
         .theta_p = 0.0f,
     };
 
-    g_kalman_queue_handle = xQueueCreate(4, sizeof(kalman_info_t));
+    g_kalman_data_queue = xQueueCreate(4, sizeof(kalman_info_t));
 
     for(;;)
     {

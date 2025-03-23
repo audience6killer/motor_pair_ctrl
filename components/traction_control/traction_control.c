@@ -27,8 +27,22 @@ static motor_pair_state_e g_traction_state = STOPPED;
 static motor_pair_data_t traction_data;
 static esp_timer_handle_t g_traction_pid_timer = NULL;
 
-
+/**
+ * @brief Control direction and speed of the motors 
+ * 
+ * @param mleft_speed_pv 
+ * @param mright_speed_pv 
+ * @return esp_err_t 
+ */
 esp_err_t tract_ctrl_speed_controlled_direction(float *mleft_speed_pv, float *mright_speed_pv);
+
+/**
+ * @brief Sends data to the data queue
+ * 
+ * @param data 
+ * @return esp_err_t 
+ */
+esp_err_t tract_ctrl_send2data_queue(motor_pair_data_t *data);
 
 static void traction_pid_loop_cb(void *args)
 {
@@ -145,10 +159,30 @@ static void traction_pid_loop_cb(void *args)
     else
         traction_data.mright_set_point = traction_handle->motor_right_ctx.desired_speed;
 
-    if (xQueueSend(g_traction_data_queue, &traction_data, portMAX_DELAY) != pdPASS)
+    // Send data to the queue
+    if (tract_ctrl_send2data_queue(&traction_data) != ESP_OK)
     {
         ESP_LOGE(TAG, "Error sending data to queue");
     }
+
+    //if (xQueueSend(g_traction_data_queue, &traction_data, portMAX_DELAY) != pdPASS)
+    //{
+    //    ESP_LOGE(TAG, "Error sending data to queue");
+    //}
+}
+
+esp_err_t tract_ctrl_send2data_queue(motor_pair_data_t *data)
+{
+    ESP_RETURN_ON_FALSE(g_traction_data_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue handle is NULL");
+    ESP_RETURN_ON_FALSE(data != NULL, ESP_ERR_INVALID_ARG, TAG, "Data is NULL");
+
+    if (xQueueSend(g_traction_data_queue, data, pdMS_TO_TICKS(20)) != pdPASS)
+    {
+        ESP_LOGE(TAG, "Error sending data to queue");
+        return ESP_FAIL;
+    }
+
+    return ESP_OK;
 }
 
 esp_err_t tract_ctrl_set_direction(const motor_pair_state_e state)
@@ -322,23 +356,23 @@ static void tract_ctrl_task(void *pvParameters)
 
     for (;;)
     {
+        // Check for new commands received
         if (xQueueReceive(g_traction_cmd_queue, &tract_ctrl_cmd, pdMS_TO_TICKS(40)) == pdTRUE)
         {
             switch (tract_ctrl_cmd.cmd)
             {
             case TRACT_CTRL_CMD_STOP:
                 ESP_LOGI(TAG, "Stop command received");
-                if(tract_ctrl_stop_pid() != ESP_OK)
+                if (tract_ctrl_stop_pid() != ESP_OK)
                 {
                     ESP_LOGE(TAG, "Error stopping PID loop");
                 }
                 break;
             case TRACT_CTRL_CMD_START:
                 ESP_LOGI(TAG, "Start command received");
-                if(tract_ctrl_start_pid() != ESP_OK)
+                if (tract_ctrl_start_pid() != ESP_OK)
                 {
                     ESP_LOGE(TAG, "Error starting PID loop");
-
                 }
                 break;
             case TRACT_CTRL_CMD_SET_SPEED:

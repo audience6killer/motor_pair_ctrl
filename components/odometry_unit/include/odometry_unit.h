@@ -7,7 +7,8 @@
 
 typedef enum {
     ODO_STOPPED,
-    ODO_READING
+    ODO_RUNNING,
+    ODO_ERROR,
 } odometry_state_e;
 
 typedef struct 
@@ -16,7 +17,6 @@ typedef struct
     float cur_value;
     float diff_value;
 } differentiator_t;
-
 
 typedef struct {
     differentiator_t x;
@@ -27,17 +27,31 @@ typedef struct {
     odometry_state_e odometry_state;
 } odometry_data_t;
 
+typedef enum {
+    ODO_CMD_START,
+    ODO_CMD_STOP
+} odometry_cmd_e;
+
 /**
- * @brief 
+ * @brief Get odometry data queue
  * 
- * @return QueueHandle_t 
+ * @param queue 
+ * @return esp_err_t 
  */
-QueueHandle_t odometry_unit_get_queue_handle(void);
+esp_err_t odometry_get_data_queue(QueueHandle_t *queue);
+
+/**
+ * @brief Get odometry command queue 
+ * 
+ * @param queue 
+ * @return esp_err_t 
+ */
+esp_err_t odometry_get_cmd_queue(QueueHandle_t *queue);
 
 /**
  * @brief Odometry start task 
  * 
  */
-void odometry_unit_start_task(void);
+void odometry_start_task(void);
 
 #endif

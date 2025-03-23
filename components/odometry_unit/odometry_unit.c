@@ -17,8 +17,26 @@
 
 static const char TAG[] = "odometry_task";
 
-static QueueHandle_t odometry_queue_handle;
+static QueueHandle_t g_odometry_data_queue;
+static QueueHandle_t g_odometry_cmd_queue;
 static odometry_data_t g_vehicle_pose;
+static esp_timer_handle_t g_odometry_timer_handle = NULL;
+
+esp_err_t odometry_get_cmd_queue(QueueHandle_t *queue)
+{
+    ESP_RETURN_ON_FALSE(g_odometry_cmd_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue handle is NULL");
+    *queue = g_odometry_cmd_queue;
+
+    return ESP_OK;
+}
+
+esp_err_t odometry_get_data_queue(QueueHandle_t *queue)
+{
+    ESP_RETURN_ON_FALSE(g_odometry_data_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue handle is NULL");
+
+    *queue = g_odometry_data_queue;
+    return ESP_OK;
+}
 
 esp_err_t initialize_odometry_data(odometry_data_t *data)
 {
@@ -58,11 +76,11 @@ esp_err_t calculate_diffential(odometry_data_t *data)
     return ESP_OK;
 }
 
-esp_err_t odometry_send_msg2queue(odometry_data_t *data)
+esp_err_t odometry_send2_data_queue(odometry_data_t *data)
 {
     ESP_RETURN_ON_FALSE(data != NULL, ESP_ERR_INVALID_STATE, TAG, "Null data to send to queue");
 
-    if (xQueueSend(odometry_queue_handle, data, portMAX_DELAY) != pdPASS)
+    if (xQueueSend(g_odometry_data_queue, data, portMAX_DELAY) != pdPASS)
     {
         ESP_LOGE(TAG, "Error sending queue");
     }
@@ -94,7 +112,7 @@ static void odometry_update_pose_loop(void *args)
 
     ESP_ERROR_CHECK(calculate_diffential(&g_vehicle_pose));
 
-    ESP_ERROR_CHECK(odometry_send_msg2queue(&g_vehicle_pose));
+    ESP_ERROR_CHECK(odometry_send2_data_queue(&g_vehicle_pose));
 }
 
 esp_err_t odometry_calculate_pose(motor_pair_data_t r_data)
@@ -113,60 +131,99 @@ esp_err_t odometry_calculate_pose(motor_pair_data_t r_data)
     return ESP_OK;
 }
 
+esp_err_t odometry_set_current_state(odometry_state_e state)
+{
+    g_vehicle_pose.odometry_state = state;
+    return ESP_OK;
+}
+
+esp_err_t odometry_stop(void)
+{
+    ESP_RETURN_ON_FALSE(g_odometry_timer_handle != NULL, ESP_ERR_INVALID_STATE, TAG, "Timer handle is NULL");
+
+    if(!esp_timer_is_active(g_odometry_timer_handle))
+    {
+        ESP_LOGW(TAG, "Odometry timer already stopped");
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Timer is being stopped!");
+    ESP_ERRRO_CHECK(esp_timer_stop(g_odometry_timer_handle));
+
+    return ESP_OK;
+}
+
+esp_err_t odometry_start(void)
+{
+    ESP_RETURN_ON_FALSE(g_odometry_timer_handle != NULL, ESP_ERR_INVALID_STATE, TAG, "Timer handle is NULL");
+
+    if(esp_timer_is_active(g_odometry_timer_handle))
+    {
+        ESP_LOGW(TAG, "Odometry timer already started");
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Timer is being started!");
+    ESP_ERROR_CHECK(esp_timer_start_periodic(g_odometry_timer_handle, ODOMETRY_LOOP_MS * 100));
+    odometry_set_current_state(ODO_RUNNING);
+
+    return ESP_OK;
+}
+
 static void odometry_unit_task(void *pvParameters)
 {
+    ESP_LOGI(TAG, "Initializing odometry task");
+
+    // Setting up traction queue and variable to save msg
     QueueHandle_t traction_control_queue = NULL;
-    while(tract_ctrl_get_data_queue(&traction_control_queue) != ESP_OK)
+    while (tract_ctrl_get_data_queue(&traction_control_queue) != ESP_OK)
     {
         ESP_LOGE(TAG, "Error getting traction control queue. Retrying...");
         vTaskDelay(pdMS_TO_TICKS(100));
     }
-
     motor_pair_data_t traction_data;
-
     initialize_odometry_data(&g_vehicle_pose);
 
+    // Setting up timer for odometry
     esp_timer_create_args_t odometry_timer_args = {
         .callback = odometry_update_pose_loop,
         .arg = NULL,
         .name = "odometry_timer_loop",
     };
+    ESP_ERROR_CHECK(esp_timer_create(&odometry_timer_args, &g_odometry_timer_handle));
 
-    esp_timer_handle_t odometry_timer_handle = NULL;
-    ESP_ERROR_CHECK(esp_timer_create(&odometry_timer_args, &odometry_timer_handle));
+    // Setting up queues
+    g_odometry_cmd_queue = xQueueCreate(4, sizeof(odometry_cmd_e));
+    g_odometry_data_queue = xQueueCreate(4, sizeof(odometry_data_t));
 
-    ESP_ERROR_CHECK(esp_timer_start_periodic(odometry_timer_handle, 10E3));
+    odometry_cmd_e cmd;
 
-    odometry_queue_handle = xQueueCreate(4, sizeof(odometry_data_t));
-
-    g_vehicle_pose.odometry_state = ODO_READING;
+    odometry_set_current_state(ODO_STOPPED);
 
     for (;;)
     {
-        if (xQueueReceive(traction_control_queue, &traction_data, portMAX_DELAY) == pdPASS)
+        if (xQueueReceive(g_odometry_data_queue, &cmd, pdMS_TO_TICKS(100)) == pdPASS)
         {
-            ESP_ERROR_CHECK(odometry_calculate_pose(traction_data));
-
-#if false 
-            printf("/*phi_l,%.4f,phi_r,%.4f,x,%.4f,y,%.4f*/\r\n", g_vehicle_pose.phi_l, g_vehicle_pose.phi_r, g_vehicle_pose.x, g_vehicle_pose.y);
-            //printf("/*left_setpoint,%d,speed_left,%d,right_setpoint,%d,speed_right,%d,state,%d,x,%.3f,y,%.3f,theta,%.3f*/\r\n", traction_data.mleft_set_point, traction_data.mleft_real_pulses, traction_data.mright_set_point, traction_data.mright_real_pulses, traction_data.state, g_vehicle_pose.x, g_vehicle_pose.y, g_vehicle_pose.theta);
-#endif
-        }
-        else
-        {
-            ESP_LOGE(TAG, "Error receiving the queue");
+            switch (cmd)
+            {
+            case ODO_CMD_START:
+                if(odometry_start() != ESP_OK)
+                    ESP_LOGE(TAG, "Error starting odometry loop");
+                break;
+            case ODO_CMD_STOP:
+                if(odometry_stop() != ESP_OK)
+                    ESP_LOGE(TAG, "Error stopping odometry loop");
+                break;
+            default:
+                break;
+            }
         }
 
         vTaskDelay(pdMS_TO_TICKS(1));
     }
 }
 
-QueueHandle_t odometry_unit_get_queue_handle(void)
-{
-    return odometry_queue_handle;
-}
-
-void odometry_unit_start_task(void)
+void odometry_start_task(void)
 {
     ESP_LOGI(TAG, "Iniatilazing task");
 
