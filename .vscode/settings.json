@@ -40,7 +40,8 @@
         "motor_pair_ctrl.h": "c",
         "cstring": "cpp",
         "esp_event.h": "c",
-        "esp_event_base.h": "c"
+        "esp_event_base.h": "c",
+        "string.h": "c"
     },
     "idf.flashType": "UART",
     "idf.pythonInstallPath": "/usr/bin/python3"

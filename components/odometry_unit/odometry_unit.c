@@ -148,7 +148,7 @@ esp_err_t odometry_stop(void)
     }
 
     ESP_LOGI(TAG, "Timer is being stopped!");
-    ESP_ERRRO_CHECK(esp_timer_stop(g_odometry_timer_handle));
+    ESP_ERROR_CHECK(esp_timer_stop(g_odometry_timer_handle));
 
     return ESP_OK;
 }
@@ -181,7 +181,6 @@ static void odometry_unit_task(void *pvParameters)
         ESP_LOGE(TAG, "Error getting traction control queue. Retrying...");
         vTaskDelay(pdMS_TO_TICKS(100));
     }
-    motor_pair_data_t traction_data;
     initialize_odometry_data(&g_vehicle_pose);
 
     // Setting up timer for odometry

@@ -79,9 +79,7 @@ typedef enum
     TURN_RIGHT_FORWARD,
     TURN_LEFT_REVERSE,
     TURN_RIGHT_REVERSE,
-    MP_BUSY,
     MP_READY,
-    MP_ERROR,
 } motor_pair_state_e;
 
 typedef struct
@@ -99,17 +97,6 @@ typedef struct
  * @param data 
  */
 void motor_pair_init_data(motor_pair_data_t *data);
-
-/**
- * @brief
- *
- * @param tf final time, in samples @10ms
- * @param t current time
- * @param qf final value in rev/s
- * @param pvPoint
- * @return esp_err_t
- */
-esp_err_t calc_lspb_speed_point(const int tf, int t, const float qf, float *pvPoint);
 
 /**
  * @brief Set motors desiered speed. Speed can be positive or negative.

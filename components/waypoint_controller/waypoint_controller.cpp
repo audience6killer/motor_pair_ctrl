@@ -10,7 +10,7 @@ extern "C"
 #include "waypoint_controller.h"
 #include "waypoint_controller_task_common.h"
 
-#include "differential_drive_ctrl.h"
+#include "diff_drive_ctrl.h"
 }
 
 static const char TAG[] = "waypoint_ctrl";
@@ -51,13 +51,13 @@ void waypoint_ctrl_trajectory_ctrl(void *args)
 {
     diff_drive_state_t state = *(diff_drive_state_t *)args;
 
-    if (state.state == POINT_REACHED)
+    if (state.state == DD_POINT_REACHED)
     {
         if (g_navigation_points.size() > 0)
         {
             navigation_point_t point = g_navigation_points.front();
             g_navigation_points.pop();
-            diff_drive_set_navigation_point(point);
+            //diff_drive_set_navigation_point(point);
             ESP_ERROR_CHECK(waypoint_ctrl_send2queue(WP_NAVIGATING));
             ESP_LOGI(TAG, "Next point in trajectory sended: (%.4f, %.4f, %.4f)", point.x, point.y, point.theta);
         }
@@ -120,7 +120,7 @@ static void waypoint_ctrl_task(void *pvParameters)
         {
             if (xQueueReceive(diff_drive_queue_pv, &diff_drive_state, portMAX_DELAY) == pdPASS)
             {
-                if (diff_drive_state.state == POINT_REACHED)
+                if (diff_drive_state.state == DD_POINT_REACHED)
                 {
                     if (!esp_timer_is_active(g_next_point_timer))
                     {

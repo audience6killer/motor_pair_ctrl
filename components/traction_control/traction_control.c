@@ -21,13 +21,13 @@
 
 static const char TAG[] = "tract_ctrl";
 
-ESP_EVENT_DEFINE_BASE(CUSTOM_EVENT_BASE);
+ESP_EVENT_DEFINE_BASE(TRACT_EVENT_BASE);
 
 static esp_event_loop_handle_t g_event_loop = NULL;
 static TaskHandle_t *parent_task = NULL;
 static motor_pair_handle_t *traction_handle = NULL;
 static QueueHandle_t g_traction_data_queue;
-static motor_pair_data_t traction_data;
+static motor_pair_data_t g_traction_state;
 static esp_timer_handle_t g_traction_pid_timer = NULL;
 
 /**
@@ -76,20 +76,20 @@ static void traction_pid_loop_cb(void *args)
     int motor_right_abs_pulses = abs(motor_right_real_pulses);
 
     // Save the real value of the speed
-    traction_data.mleft_pulses = motor_left_real_pulses;
-    traction_data.mright_pulses = motor_right_real_pulses;
+    g_traction_state.mleft_pulses = motor_left_real_pulses;
+    g_traction_state.mright_pulses = motor_right_real_pulses;
 
     motor_right_last_pulse_count = motor_right_cur_pulse_count;
     motor_left_last_pulse_count = motor_left_cur_pulse_count;
 
     // Check whether the state has changed
     // TODO Add Stopped state action
-    if (last_traction_state != traction_data.state)
+    if (last_traction_state != g_traction_state.state)
     {
-        last_traction_state = traction_data.state;
-        traction_data.state = traction_data.state;
+        last_traction_state = g_traction_state.state;
+        g_traction_state.state = g_traction_state.state;
 
-        switch (traction_data.state)
+        switch (g_traction_state.state)
         {
         case BRAKE:
             ESP_ERROR_CHECK(bdc_motor_brake(traction_handle->motor_left_ctx.motor));
@@ -161,18 +161,18 @@ static void traction_pid_loop_cb(void *args)
     }
 
     // Save information
-    if (traction_data.state == REVERSE || traction_data.state == TURN_LEFT_FORWARD || traction_data.state == TURN_RIGHT_REVERSE)
-        traction_data.mleft_set_point = (-1) * traction_handle->motor_left_ctx.desired_speed;
+    if (g_traction_state.state == REVERSE || g_traction_state.state == TURN_LEFT_FORWARD || g_traction_state.state == TURN_RIGHT_REVERSE)
+        g_traction_state.mleft_set_point = (-1) * traction_handle->motor_left_ctx.desired_speed;
     else
-        traction_data.mleft_set_point = traction_handle->motor_left_ctx.desired_speed;
+        g_traction_state.mleft_set_point = traction_handle->motor_left_ctx.desired_speed;
 
-    if (traction_data.state == REVERSE || traction_data.state == TURN_RIGHT_FORWARD || traction_data.state == TURN_LEFT_REVERSE)
-        traction_data.mright_set_point = (-1) * traction_handle->motor_right_ctx.desired_speed;
+    if (g_traction_state.state == REVERSE || g_traction_state.state == TURN_RIGHT_FORWARD || g_traction_state.state == TURN_LEFT_REVERSE)
+        g_traction_state.mright_set_point = (-1) * traction_handle->motor_right_ctx.desired_speed;
     else
-        traction_data.mright_set_point = traction_handle->motor_right_ctx.desired_speed;
+        g_traction_state.mright_set_point = traction_handle->motor_right_ctx.desired_speed;
 
     // Send data to the queue
-    if (tract_ctrl_send2data_queue(&traction_data) != ESP_OK)
+    if (tract_ctrl_send2data_queue(&g_traction_state) != ESP_OK)
     {
         ESP_LOGE(TAG, "Error sending data to queue");
     }
@@ -195,7 +195,7 @@ esp_err_t tract_ctrl_send2data_queue(motor_pair_data_t *data)
 esp_err_t tract_ctrl_set_direction(const motor_pair_state_e state)
 {
     // TODO: Some kind of verification might be necessary
-    traction_data.state = state;
+    g_traction_state.state = state;
     return ESP_OK;
 }
 
@@ -387,8 +387,8 @@ static void tract_ctrl_task(void *pvParameters)
     // Enable motors
     ESP_ERROR_CHECK(motor_pair_enable_motors(traction_handle));
 
-    // Initialize traction_data
-    traction_data = (motor_pair_data_t){
+    // Initialize g_traction_state
+    g_traction_state = (motor_pair_data_t){
         .state = STOPPED,
         .mleft_pulses = 0.0f,
         .mright_pulses = 0.0f,
@@ -414,11 +414,15 @@ static void tract_ctrl_task(void *pvParameters)
     ESP_ERROR_CHECK(esp_event_loop_create(&event_loop_args, g_event_loop));
 
     // Register event handlers
-    ESP_ERROR_CHECK(esp_event_handler_register_with(g_event_loop, CUSTOM_EVENT_BASE, TRACT_CTRL_CMD_START, tract_ctrl_start_event_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register_with(g_event_loop, CUSTOM_EVENT_BASE, TRACT_CTRL_CMD_STOP, tract_ctrl_stop_event_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register_with(g_event_loop, CUSTOM_EVENT_BASE, TRACT_CTRL_CMD_SET_SPEED, tract_ctrl_set_speed_event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register_with(g_event_loop, TRACT_EVENT_BASE, TRACT_CTRL_CMD_START, tract_ctrl_start_event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register_with(g_event_loop, TRACT_EVENT_BASE, TRACT_CTRL_CMD_STOP, tract_ctrl_stop_event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register_with(g_event_loop, TRACT_EVENT_BASE, TRACT_CTRL_CMD_SET_SPEED, tract_ctrl_set_speed_event_handler, NULL));
 
-    // Notify the parent task the end of initializacion
+    // Notify tasks end of initialization
+    g_traction_state.state = MP_READY;
+    tract_ctrl_send2data_queue(&g_traction_state);
+
+    /* Notify the parent task the end of initialization */
     xTaskNotifyGive(*parent_task);
 
     for (;;)

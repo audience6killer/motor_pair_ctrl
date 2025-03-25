@@ -16,6 +16,8 @@
 #include "esp_event.h"
 #include "motor_pair_ctrl.h"
 
+ESP_EVENT_DECLARE_BASE(TRACT_EVENT_BASE);
+
 typedef enum
 {
     TRACT_CTRL_CMD_SET_SPEED,

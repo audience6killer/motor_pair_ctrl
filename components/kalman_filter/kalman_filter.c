@@ -62,7 +62,9 @@ esp_err_t kalman_send2queue(kalman_info_t *data)
 
 static void kalman_filter_task(void *pvParameters)
 {
-    QueueHandle_t odometry_queue_pv = odometry_unit_get_queue_handle();
+    QueueHandle_t odometry_queue_handle = NULL;
+    odometry_get_data_queue(&odometry_queue_handle); 
+
     odometry_data_t odo_robot_pose;
 
     kalman_info_t nav_point = (kalman_info_t){
@@ -80,7 +82,7 @@ static void kalman_filter_task(void *pvParameters)
 
     for(;;)
     {
-        if(xQueueReceive(odometry_queue_pv, &odo_robot_pose, portMAX_DELAY) == pdPASS)
+        if(xQueueReceive(odometry_queue_handle, &odo_robot_pose, portMAX_DELAY) == pdPASS)
         {
             nav_point = (kalman_info_t){
                 .x = odo_robot_pose.x.cur_value,

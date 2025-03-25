@@ -1,6 +1,13 @@
 #ifndef DIFF_DRIVE_TASK_COMMON_H
 #define DIFF_DRIVE_TASK_COMMON_H
 
+#ifndef MIN
+#define MIN(X, Y) ((X) < (Y) ? (X) : (Y))
+#endif
+
+#ifndef MAX
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#endif
 
 #define DIFF_DRIVE_STACK_SIZE          4096
 #define DIFF_DRIVE_CORE_ID             0
