@@ -1,6 +1,10 @@
 #ifndef     KALMAN_FILTER_H
 #define     KALMAN_FILTER_H
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "esp_err.h"
+
 typedef struct
 {
     float x;

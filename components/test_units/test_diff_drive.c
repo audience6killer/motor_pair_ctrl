@@ -24,14 +24,14 @@ static void test_diff_drive_task(void *pvParameters)
     ESP_ERROR_CHECK(diff_drive_get_queue_handle(&diff_drive_data_queue));
     diff_drive_state_t diff_drive_state;
 
-
+    const char *state = "NULL";
     for (;;)
     {
         if (xQueueReceive(diff_drive_data_queue, &diff_drive_state, portMAX_DELAY) == pdPASS)
         {
 #if true
-            const char *diff_drive = diff_drive_state_2_string(diff_drive_state.state);
-            printf("errx,%.4f,erry,%.4f,errtheta,%.4f,errdist,%.4f,errori,%.4f,diffstate,%s\r\n", diff_drive_state.err_x, diff_drive_state.err_y, diff_drive_state.err_theta,diff_drive_state.err_dist, diff_drive_state.err_ori, diff_drive);
+            const char *state_str = diff_drive_state_2_string(diff_drive_state.state);
+            printf("errx,%.4f,erry,%.4f,errtheta,%.4f,errdist,%.4f,errori,%.4f,diffstate,%s\r\n", diff_drive_state.err_x, diff_drive_state.err_y, diff_drive_state.err_theta,diff_drive_state.err_dist, diff_drive_state.err_ori, state_str);
 #endif
         }
         else
@@ -49,7 +49,7 @@ void test_diff_drive_task_start(void)
 
     TaskHandle_t parent = NULL;
 
-    xTaskCreatePinnedToCore(&test_diff_drive_task, "test_diff_drive", 1094, NULL, 10, &parent, 0);
+    xTaskCreatePinnedToCore(&test_diff_drive_task, "test_diff_drive", 4096, NULL, 10, &parent, 0);
 
-    diff_drive_task_start(&parent);
+    diff_drive_task_start(parent);
 }

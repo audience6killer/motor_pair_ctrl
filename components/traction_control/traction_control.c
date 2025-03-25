@@ -411,7 +411,7 @@ static void tract_ctrl_task(void *pvParameters)
         .task_stack_size = 2084,
         .task_core_id = 0};
 
-    ESP_ERROR_CHECK(esp_event_loop_create(&event_loop_args, g_event_loop));
+    ESP_ERROR_CHECK(esp_event_loop_create(&event_loop_args, &g_event_loop));
 
     // Register event handlers
     ESP_ERROR_CHECK(esp_event_handler_register_with(g_event_loop, TRACT_EVENT_BASE, TRACT_CTRL_CMD_START, tract_ctrl_start_event_handler, NULL));

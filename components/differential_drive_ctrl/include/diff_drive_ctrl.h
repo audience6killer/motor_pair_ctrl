@@ -58,6 +58,6 @@ static inline const char* diff_drive_state_2_string(diff_drive_state_e state)
 
 esp_err_t diff_drive_get_queue_handle(QueueHandle_t *queue);
 
-void diff_drive_task_start(TaskHandle_t *parent);
+void diff_drive_task_start(TaskHandle_t parent);
 
 #endif

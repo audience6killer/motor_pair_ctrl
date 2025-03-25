@@ -2,8 +2,8 @@ extern "C"
 {
 //#include "traction_control.h"
 // #include "test_traction_control.h"
-//#include "kalman_filter.h"
-//#include "odometry_unit.h"
+    #include "kalman_filter.h"
+    #include "odometry_unit.h"
 //#include "diff_drive_ctrl.h"
 //#include "waypoint_controller.h"
     // #include "seed_planter_control.h"
@@ -20,9 +20,10 @@ extern "C" void app_main(void)
 
     Serial.begin(115200);
 
+    test_diff_drive_task_start();
     //tract_ctrl_start_task();
-    //odometry_start_task();
-    //kalman_filter_start_task();
+    odometry_start_task();
+    kalman_filter_start_task();
     //diff_drive_ctrl_task_start();
     //waypoint_ctrl_start_task();
 
@@ -30,7 +31,6 @@ extern "C" void app_main(void)
     // seed_planter_control_start_task();
     // test_seed_planter_start_task();
 
-    test_diff_drive_task_start();
 
     for (;;)
     {

@@ -23,7 +23,7 @@ static diff_drive_handle_t *diff_drive_handle = NULL;
 static TaskHandle_t g_diff_drive_task_pv = NULL;
 static esp_event_loop_handle_t g_tract_event_handle = NULL;
 static esp_event_loop_handle_t g_diff_drive_event_handle = NULL;
-static TaskHandle_t *g_parent_ptr = NULL;
+static TaskHandle_t g_parent_ptr = NULL;
 static bool g_is_running = false;
 
 static diff_drive_state_t g_diff_drive_state;
@@ -340,7 +340,13 @@ static void diff_drive_task(void *pvParameters)
 
     QueueHandle_t kalman_data_queue_handle = NULL;
 
-    ESP_ERROR_CHECK(kalman_fiter_get_data_queue(&kalman_data_queue_handle));
+    while(kalman_fiter_get_data_queue(&kalman_data_queue_handle) != ESP_OK)
+    {
+        ESP_LOGW(TAG, "Retriying getting kalman data queue...");
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+    ESP_LOGI(TAG, "Kalman data queue obtained");
+
     ESP_ERROR_CHECK(tract_ctrl_get_event_loop_handle(&g_tract_event_handle));
 
     g_diff_drive_state = (diff_drive_state_t){
@@ -374,7 +380,7 @@ static void diff_drive_task(void *pvParameters)
 
     /* Notify parent task the end of initialization */
     if (g_parent_ptr != NULL)
-        xTaskNotifyGive(*g_parent_ptr);
+        xTaskNotifyGive(g_parent_ptr);
 
     for (;;)
     {
@@ -387,12 +393,11 @@ static void diff_drive_task(void *pvParameters)
     }
 }
 
-void diff_drive_task_start(TaskHandle_t *parent)
+void diff_drive_task_start(TaskHandle_t parent)
 {
     ESP_LOGI(TAG, "Initializing navigation task");
 
     g_parent_ptr = parent;
-
 
     xTaskCreatePinnedToCore(&diff_drive_task, "navigation_unit", DIFF_DRIVE_STACK_SIZE, NULL, DIFF_DRIVE_TASK_PRIORITY, &g_diff_drive_task_pv, DIFF_DRIVE_CORE_ID);
     
