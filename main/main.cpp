@@ -23,7 +23,7 @@ extern "C" void app_main(void)
     test_diff_drive_task_start();
     //tract_ctrl_start_task();
     odometry_start_task();
-    kalman_filter_start_task();
+    kalman_start_task();
     //diff_drive_ctrl_task_start();
     //waypoint_ctrl_start_task();
 

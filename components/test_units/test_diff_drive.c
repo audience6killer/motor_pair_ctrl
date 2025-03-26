@@ -39,7 +39,8 @@ void test_kalman_receive_data(void)
     if(xQueueReceive(g_kalman_data_queue, &kalman_data, 0) == pdPASS)
     {
 #if true
-        printf("x,%.4f,y,%.4f,z,%.4f,theta,%.4f,x_p,%.4f,y_p,%.4f,z_p,%.4f,thetap,%.4f\r\n", kalman_data.x, kalman_data.y, kalman_data.z, kalman_data.theta, kalman_data.x_p, kalman_data.y_p, kalman_data.z_p, kalman_data.theta_p);
+        const char *state = kalman_state_to_name(kalman_data.state);
+        printf("/*KALMAN: x,%.4f,y,%.4f,z,%.4f,theta,%.4f,x_p,%.4f,y_p,%.4f,z_p,%.4f,thetap,%.4f,state,%s*/\r\n", kalman_data.x, kalman_data.y, kalman_data.z, kalman_data.theta, kalman_data.x_p, kalman_data.y_p, kalman_data.z_p, kalman_data.theta_p, state);
 #endif
     }
 }
@@ -49,9 +50,9 @@ void test_tract_receive_data(void)
     static motor_pair_data_t tract_data;
     if (xQueueReceive(g_tract_data_queue, &tract_data, portMAX_DELAY) == pdPASS)
     {
-#if false 
+#if true 
         const char *tract_state_str = motor_pair_state_2_string(tract_data.state);
-        printf("mleft_pulses,%d,mright_pulses,%d,mleft_set_point,%d,mright_set_point,%d,state,%s\r\n", tract_data.mleft_pulses, tract_data.mright_pulses, tract_data.mleft_set_point, tract_data.mright_set_point, tract_state_str);
+        printf("/*TRACT: mleft_pulses,%d,mright_pulses,%d,mleft_set_point,%d,mright_set_point,%d,state,%s*/\r\n", tract_data.mleft_pulses, tract_data.mright_pulses, tract_data.mleft_set_point, tract_data.mright_set_point, tract_state_str);
 #endif
     }
 }
@@ -63,7 +64,7 @@ void test_diff_drive_recive_data(void)
     {
 #if true
         const char *state_str = diff_drive_state_2_string(diff_drive_state.state);
-        printf("errx,%.4f,erry,%.4f,errtheta,%.4f,errdist,%.4f,errori,%.4f,state,%s\r\n", diff_drive_state.err_x, diff_drive_state.err_y, diff_drive_state.err_theta, diff_drive_state.err_dist, diff_drive_state.err_ori, state_str);
+        printf("/*DIFF_DRIVE: errx,%.4f,erry,%.4f,errtheta,%.4f,errdist,%.4f,errori,%.4f,state,%s*/\r\n", diff_drive_state.err_x, diff_drive_state.err_y, diff_drive_state.err_theta, diff_drive_state.err_dist, diff_drive_state.err_ori, state_str);
 
         if (diff_drive_state.state == DD_READY)
         {
@@ -84,7 +85,7 @@ static void test_diff_drive_task(void *pvParameters)
 
     ESP_ERROR_CHECK(diff_drive_get_queue_handle(&g_diff_drive_queue));
     ESP_ERROR_CHECK(tract_ctrl_get_data_queue(&g_tract_data_queue));
-    ESP_ERROR_CHECK(kalman_fiter_get_data_queue(&g_kalman_data_queue));
+    ESP_ERROR_CHECK(kalman_get_data_queue(&g_kalman_data_queue));
 
     ESP_ERROR_CHECK(diff_drive_get_event_loop(&g_diff_drive_event_loop));
 

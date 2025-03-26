@@ -263,7 +263,7 @@ static void data_center_send_task(void *args)
     QueueHandle_t tract_ctrl_data_queue = NULL;
     QueueHandle_t kalman_data_queue = NULL;
     ESP_ERROR_CHECK(tract_ctrl_get_data_queue(&tract_ctrl_data_queue));
-    ESP_ERROR_CHECK(kalman_fiter_get_data_queue(&kalman_data_queue));
+    ESP_ERROR_CHECK(kalman_get_data_queue(&kalman_data_queue));
 
     // LoRa queues
     ESP_ERROR_CHECK(lora_get_queue_data2send(&g_lora_data2send_queue));

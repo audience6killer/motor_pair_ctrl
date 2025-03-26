@@ -4,6 +4,15 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "esp_err.h"
+#include "esp_event.h"
+
+ESP_EVENT_DECLARE_BASE(KALMAN_EVENT_BASE);
+
+typedef enum {
+    KALMAN_RUNNING = 0,
+    KALMAN_STOPPED,
+    KALMAN_READY,
+} kalman_state_e;
 
 typedef struct
 {
@@ -15,14 +24,25 @@ typedef struct
     float y_p;
     float z_p;
     float theta_p;
+    kalman_state_e state;
 } kalman_info_t;
+
+typedef enum {
+    KALMAN_START_EVENT = 0,
+    KALMAN_STOP_EVENT,
+} kalman_events_e; 
+
+static inline const char* kalman_state_to_name(kalman_state_e state)
+{
+    static const char *states[] = {"RUNNING", "STOPPED", "READY"}; 
+    
+    return states[state];
+}
 
 esp_err_t kalman_initialize_info(kalman_info_t *data);
 
-esp_err_t kalman_fiter_get_data_queue(QueueHandle_t *handle);
+esp_err_t kalman_get_data_queue(QueueHandle_t *handle);
 
-esp_err_t kalman_fiter_get_cmd_queue(QueueHandle_t *handle);
-
-void kalman_filter_start_task(void);
+void kalman_start_task(void);
 
 #endif

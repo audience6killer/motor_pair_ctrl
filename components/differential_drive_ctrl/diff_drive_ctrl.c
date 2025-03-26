@@ -277,8 +277,9 @@ esp_err_t diff_drive_receive_kalman_info(QueueHandle_t *kalman_queue_handle)
     if (xQueueReceive(*kalman_queue_handle, &vehicle_pose, pdMS_TO_TICKS(100)) == pdPASS)
     {
 
-#if false 
-            printf("/*x,%f,xd,%f,y,%f,yd,%f,theta,%f,thetad,%f,state,%d*/\r\n", vehicle_pose.x, g_current_point.x, vehicle_pose.y, g_current_point.y, vehicle_pose.theta, g_current_point.theta, g_diff_drive_state);
+#if true
+        const char *state = kalman_state_to_name(vehicle_pose.state);
+        printf("/*x,%f,xd,%f,y,%f,yd,%f,theta,%f,thetad,%f,state,%s*/\r\n", vehicle_pose.x, g_current_point.x, vehicle_pose.y, g_current_point.y, vehicle_pose.theta, g_current_point.theta, state);
 #endif
         if (g_diff_drive_state.state == DD_ORIENTING || g_diff_drive_state.state == DD_NAVIGATING)
             ESP_ERROR_CHECK(diff_drive_point_follower(&vehicle_pose));
@@ -360,7 +361,7 @@ static void diff_drive_task(void *pvParameters)
 
     QueueHandle_t kalman_data_queue_handle = NULL;
 
-    while (kalman_fiter_get_data_queue(&kalman_data_queue_handle) != ESP_OK)
+    while (kalman_get_data_queue(&kalman_data_queue_handle) != ESP_OK)
     {
         ESP_LOGW(TAG, "Retriying getting kalman data queue...");
         vTaskDelay(pdMS_TO_TICKS(10));
