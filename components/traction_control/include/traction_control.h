@@ -28,8 +28,8 @@ typedef enum
 typedef struct
 {
     tract_ctrl_cmd_e cmd;
-    float *motor_left_speed;
-    float *motor_right_speed;
+    float motor_left_speed;
+    float motor_right_speed;
 } tract_ctrl_cmd_t;
 
 /**

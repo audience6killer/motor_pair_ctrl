@@ -40,7 +40,7 @@ typedef struct
     float y;
     float theta;
 
-    diff_drive_state_t state;
+    //diff_drive_state_t state;
 } navigation_point_t;
 
 typedef enum {
@@ -51,10 +51,12 @@ typedef enum {
 
 static inline const char* diff_drive_state_2_string(diff_drive_state_e state)
 {
-    static const char *strings[] = {"Stopped", "Ready", "Point Reached", "Orienting", "Navigating"};
+    static const char *strings[] = {"Stopped", "Ready", "Started", "Point Reached", "Orienting", "Navigating"};
 
     return strings[state];
 }
+
+esp_err_t diff_drive_get_event_loop(esp_event_loop_handle_t *handle);
 
 esp_err_t diff_drive_get_queue_handle(QueueHandle_t *queue);
 

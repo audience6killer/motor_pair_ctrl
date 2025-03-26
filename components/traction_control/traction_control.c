@@ -37,7 +37,7 @@ static esp_timer_handle_t g_traction_pid_timer = NULL;
  * @param speed_right 
  * @return esp_err_t 
  */
-esp_err_t tract_ctrl_set_speed(float *speed_left, float *speed_right);
+esp_err_t tract_ctrl_set_speed(float mleft_speed, float mright_speed);
 
 /**
  * @brief Control direction and speed of the motors
@@ -136,6 +136,9 @@ static void traction_pid_loop_cb(void *args)
             ESP_ERROR_CHECK(bdc_motor_forward(traction_handle->motor_right_ctx.motor));
             ESP_LOGI(TAG, "tract_ctrl_STATE: RIGHT REVERSE");
             break;
+        case MP_READY:
+            ESP_LOGI(TAG, "tract_ctrl_STATE: READY!");
+            break;
         default:
             ESP_LOGI(TAG, "tract_ctrl_STATE: ERRORRRRRRRRR");
             break;
@@ -172,9 +175,11 @@ static void traction_pid_loop_cb(void *args)
         g_traction_state.mright_set_point = traction_handle->motor_right_ctx.desired_speed;
 
     // Send data to the queue
-    if (tract_ctrl_send2data_queue(&g_traction_state) != ESP_OK)
+    esp_err_t ret = tract_ctrl_send2data_queue(&g_traction_state);
+    
+    if (ret != ESP_OK)
     {
-        ESP_LOGE(TAG, "Error sending data to queue");
+        ESP_LOGE(TAG, "Error sending data to queue. Code: %s", esp_err_to_name(ret));
     }
 }
 
@@ -182,12 +187,10 @@ esp_err_t tract_ctrl_send2data_queue(motor_pair_data_t *data)
 {
     ESP_RETURN_ON_FALSE(g_traction_data_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue handle is NULL");
     ESP_RETURN_ON_FALSE(data != NULL, ESP_ERR_INVALID_ARG, TAG, "Data is NULL");
+    esp_err_t ret = xQueueSend(g_traction_data_queue, data, portMAX_DELAY);
 
-    if (xQueueSend(g_traction_data_queue, data, pdMS_TO_TICKS(20)) != pdPASS)
-    {
-        ESP_LOGE(TAG, "Error sending data to queue");
-        return ESP_FAIL;
-    }
+    if (ret != pdTRUE)
+        return ret;
 
     return ESP_OK;
 }
@@ -200,12 +203,10 @@ esp_err_t tract_ctrl_set_direction(const motor_pair_state_e state)
 }
 
 
-esp_err_t tract_ctrl_set_speed(float *speed_left, float *speed_right)
+esp_err_t tract_ctrl_set_speed(float mleft_speed, float mright_speed)
 {
-    float mleft_speed = *speed_left;
-    float mright_speed = *speed_right;
-    float mleft_abs = fabs(*speed_left);
-    float mright_abs = fabs(*speed_right);
+    float mleft_abs = fabs(mleft_speed);
+    float mright_abs = fabs(mright_speed);
 
     // printf("mleft_abs: %f, mright_abs: %f\n", mleft_abs, mright_abs);
 
@@ -253,7 +254,7 @@ static void tract_ctrl_stop_event_handler(void *handler_args, esp_event_base_t b
     }
 
     float zero_speed = 0.0f;
-    tract_ctrl_set_speed(&zero_speed, &zero_speed);
+    tract_ctrl_set_speed(zero_speed, zero_speed);
     ESP_ERROR_CHECK(bdc_motor_brake(traction_handle->motor_left_ctx.motor));
     ESP_ERROR_CHECK(bdc_motor_brake(traction_handle->motor_right_ctx.motor));
     pid_reset_ctrl_block(traction_handle->motor_left_ctx.pid_ctrl);
@@ -309,7 +310,7 @@ static void tract_ctrl_set_speed_event_handler(void *handler_args, esp_event_bas
     float mright_speed = data[1];
    
     // TODO: Some kind of error handling
-    tract_ctrl_set_speed(&mleft_speed, &mright_speed);
+    tract_ctrl_set_speed(mleft_speed, mright_speed);
 }
 
 esp_err_t tract_ctrl_get_data_queue(QueueHandle_t *queue)
@@ -398,10 +399,10 @@ static void tract_ctrl_task(void *pvParameters)
 
     // Set initial speed
     float initial_speed = 0.0f;
-    tract_ctrl_set_speed(&initial_speed, &initial_speed);
+    tract_ctrl_set_speed(initial_speed, initial_speed);
 
     // Setting up queue
-    g_traction_data_queue = xQueueCreate(4, sizeof(motor_pair_data_t));
+    g_traction_data_queue = xQueueCreate(20, sizeof(motor_pair_data_t));
 
     // TODO: Set event loop correct values
     esp_event_loop_args_t event_loop_args = {

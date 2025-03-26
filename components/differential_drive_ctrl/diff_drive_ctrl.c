@@ -69,8 +69,8 @@ esp_err_t diff_drive_orientation_control(float theta_error)
     float right_speed = (float)RADS2REVS(phi_p);
     tract_ctrl_cmd_t cmd = {
         .cmd = TRACT_CTRL_CMD_SET_SPEED,
-        .motor_left_speed = &left_speed,
-        .motor_right_speed = &right_speed,
+        .motor_left_speed = left_speed,
+        .motor_right_speed = right_speed,
     };
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(diff_drive_post_to_tract(cmd));
@@ -100,8 +100,8 @@ esp_err_t diff_drive_position_control(float theta_error)
 
     tract_ctrl_cmd_t cmd = {
         .cmd = TRACT_CTRL_CMD_SET_SPEED,
-        .motor_left_speed = &left_speed,
-        .motor_right_speed = &right_speed,
+        .motor_left_speed = left_speed,
+        .motor_right_speed = right_speed,
     };
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(diff_drive_post_to_tract(cmd));
@@ -145,8 +145,8 @@ esp_err_t diff_drive_point_follower(kalman_info_t *c_pose)
         ESP_LOGI(TAG, "Vehicle reached point: (%f, %f, theta:%f)\n", g_current_point.x, g_current_point.y, g_current_point.theta);
         ESP_ERROR_CHECK(diff_drive_post_to_tract((tract_ctrl_cmd_t){
             .cmd = TRACT_CTRL_CMD_STOP,
-            .motor_left_speed = NULL,
-            .motor_right_speed = NULL,
+            .motor_left_speed = 0.0f,
+            .motor_right_speed = 0.0f,
         }));
         g_diff_drive_state.state = DD_POINT_REACHED;
 
@@ -158,19 +158,21 @@ esp_err_t diff_drive_point_follower(kalman_info_t *c_pose)
 
 esp_err_t diff_drive_set_navigation_point(const navigation_point_t *point)
 {
-    ESP_RETURN_ON_FALSE(g_diff_drive_state.state == DD_POINT_REACHED, ESP_ERR_INVALID_STATE, TAG, "Trying to change nav point before trajectory is compleated");
+    ESP_RETURN_ON_FALSE(g_diff_drive_state.state == DD_POINT_REACHED || g_diff_drive_state.state == DD_READY, ESP_ERR_INVALID_STATE, TAG, "Trying to change nav point before trajectory is compleated");
 
-    ESP_LOGI(TAG, "New desired pose: (%.4f, %.4f, %.2f)\r\n", point->x, point->y, point->theta);
+    ESP_LOGI(TAG, "New desired pose: (%.4f, %.4f, %.2f)", point->x, point->y, point->theta);
 
     g_current_point = *point;
     g_diff_drive_state.state = DD_ORIENTING;
 
-    ESP_ERROR_CHECK(diff_drive_send2queue(&g_diff_drive_state));
-    ESP_ERROR_CHECK(diff_drive_post_to_tract((tract_ctrl_cmd_t){
+    tract_ctrl_cmd_t cmd = (tract_ctrl_cmd_t){
         .cmd = TRACT_CTRL_CMD_START,
-        .motor_left_speed = NULL,
-        .motor_right_speed = NULL,
-    }));
+        .motor_left_speed = 0.0f,
+        .motor_right_speed = 0.0f,
+    };
+
+    ESP_ERROR_CHECK(diff_drive_send2queue(&g_diff_drive_state));
+    ESP_ERROR_CHECK(diff_drive_post_to_tract(cmd));
 
     return ESP_OK;
 }
@@ -184,14 +186,32 @@ esp_err_t diff_drive_get_queue_handle(QueueHandle_t *queue)
     return ESP_OK;
 }
 
+esp_err_t diff_drive_get_event_loop(esp_event_loop_handle_t *handle)
+{
+    ESP_RETURN_ON_FALSE(g_diff_drive_event_handle != NULL, ESP_ERR_INVALID_STATE, TAG, "Event loop is NULL");
+
+    *handle = g_diff_drive_event_handle;
+
+    return ESP_OK;
+}
+
 esp_err_t diff_drive_post_to_tract(tract_ctrl_cmd_t cmd)
 {
     ESP_RETURN_ON_FALSE(g_tract_event_handle != NULL, ESP_ERR_INVALID_STATE, TAG, "Traction control event loop handle is NULL");
 
-    float data[2] = {*cmd.motor_left_speed, *cmd.motor_right_speed};
-    if (esp_event_post_to(g_tract_event_handle, TRACT_EVENT_BASE, cmd.cmd, data, sizeof(data), pdMS_TO_TICKS(20)) != pdPASS)
+    float *data = NULL;
+    if (cmd.cmd == TRACT_CTRL_CMD_SET_SPEED)
     {
-        ESP_LOGE(TAG, "Error posting data to event loop");
+        data = (float *)malloc(2 * sizeof(float));
+        data[0] = cmd.motor_left_speed;
+        data[1] = cmd.motor_right_speed;
+    }
+
+    esp_err_t ret = esp_event_post_to(g_tract_event_handle, TRACT_EVENT_BASE, cmd.cmd, data, sizeof(data), pdMS_TO_TICKS(100));
+
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Error posting data to event loop. Error: %s", esp_err_to_name(ret));
         return ESP_FAIL;
     }
 
@@ -340,7 +360,7 @@ static void diff_drive_task(void *pvParameters)
 
     QueueHandle_t kalman_data_queue_handle = NULL;
 
-    while(kalman_fiter_get_data_queue(&kalman_data_queue_handle) != ESP_OK)
+    while (kalman_fiter_get_data_queue(&kalman_data_queue_handle) != ESP_OK)
     {
         ESP_LOGW(TAG, "Retriying getting kalman data queue...");
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -361,9 +381,9 @@ static void diff_drive_task(void *pvParameters)
     // Setting up the event loop
     esp_event_loop_args_t event_loop_args = {
         .queue_size = 10,
-        .task_name = "diff_drive event loop",
+        .task_name = "diff_drive_event_loop",
         .task_priority = 5,
-        .task_stack_size = 1084,
+        .task_stack_size = 4084,
         .task_core_id = 0,
     };
 
@@ -400,7 +420,7 @@ void diff_drive_task_start(TaskHandle_t parent)
     g_parent_ptr = parent;
 
     xTaskCreatePinnedToCore(&diff_drive_task, "navigation_unit", DIFF_DRIVE_STACK_SIZE, NULL, DIFF_DRIVE_TASK_PRIORITY, &g_diff_drive_task_pv, DIFF_DRIVE_CORE_ID);
-    
+
     // Initialize traction task
     tract_ctrl_start_task(&g_diff_drive_task_pv);
 }
