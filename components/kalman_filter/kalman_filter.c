@@ -14,9 +14,10 @@ ESP_EVENT_DEFINE_BASE(KALMAN_EVENT_BASE);
 static const char TAG[] = "kalman_task";
 static QueueHandle_t g_kalman_data_queue = NULL;
 static esp_event_loop_handle_t g_kalman_event_loop_handle = NULL;
+static esp_event_loop_handle_t g_odometry_event_loop_handle = NULL;
 static QueueHandle_t g_odometry_queue_handle = NULL;
 static kalman_info_t g_current_state;
-static bool g_is_running = false;
+static TaskHandle_t g_kalman_task_pv = NULL;
 
 esp_err_t kalman_initialize_info(kalman_info_t *data)
 {
@@ -61,69 +62,83 @@ void kalman_set_state(kalman_state_e state)
     g_current_state.state = state;
 }
 
-static void kalman_stop_event_handler(void *handler_args, esp_event_base_t base, int32_t id, void *event_data)
+esp_err_t kalman_get_event_loop(esp_event_loop_handle_t *handle)
 {
-    ESP_LOGI(TAG, "Stopping");
+    ESP_RETURN_ON_FALSE(g_kalman_event_loop_handle != NULL, ESP_ERR_INVALID_STATE, TAG, "Event loop not initialized");
 
-    if (g_is_running == false)
-    {
-        ESP_LOGW(TAG, "Kalman filter is already stopped");
-        return;
-    }
-
-    g_is_running = false;
-
-    return;
-}
-
-static void kalman_start_event_handler(void *handler_args, esp_event_base_t base, int32_t id, void *event_data)
-{
-    ESP_LOGI(TAG, "Starting up");
-
-    if (g_is_running == true)
-    {
-        ESP_LOGW(TAG, "Kalman filter is already running");
-        return;
-    }
-
-    g_is_running = true;
-
-    return;
+    *handle = g_kalman_event_loop_handle;
+    return ESP_OK;
 }
 
 void kalman_receive_odometry_data(void)
 {
     static odometry_data_t odo_robot_pose;
 
-
-    if (xQueueReceive(g_odometry_queue_handle, &odo_robot_pose, portMAX_DELAY) == pdPASS)
+    if (g_current_state.state == KALMAN_STARTED)
     {
-        g_current_state = (kalman_info_t){
-            .x = odo_robot_pose.x.cur_value,
-            .y = odo_robot_pose.y.cur_value,
-            .z = 0.0f,
-            .theta = odo_robot_pose.theta.cur_value,
-            .x_p = odo_robot_pose.x.diff_value,
-            .y_p = odo_robot_pose.y.diff_value,
-            .z_p = 0.0f,
-            .theta_p = odo_robot_pose.theta.diff_value,
-        };
+        if (xQueueReceive(g_odometry_queue_handle, &odo_robot_pose, portMAX_DELAY) == pdPASS)
+        {
+            g_current_state = (kalman_info_t){
+                .x = odo_robot_pose.x.cur_value,
+                .y = odo_robot_pose.y.cur_value,
+                .z = 0.0f,
+                .theta = odo_robot_pose.theta.cur_value,
+                .x_p = odo_robot_pose.x.diff_value,
+                .y_p = odo_robot_pose.y.diff_value,
+                .z_p = 0.0f,
+                .theta_p = odo_robot_pose.theta.diff_value,
+            };
 
-        ESP_ERROR_CHECK(kalman_send2queue(&g_current_state));
-    }
-    else
-    {
-        ESP_LOGE(TAG, "Error receiving queue");
+            ESP_ERROR_CHECK(kalman_send2queue(&g_current_state));
+        }
+        else
+        {
+            ESP_LOGE(TAG, "Error receiving queue");
+        }
     }
 }
 
+/* Event handlers */
+static void kalman_stop_event_handler(void *handler_args, esp_event_base_t base, int32_t id, void *event_data)
+{
+    ESP_LOGI(TAG, "Stopping");
+
+    if (g_current_state.state == KALMAN_STOPPED)
+    {
+        ESP_LOGW(TAG, "Kalman filter is already stopped");
+        return;
+    }
+
+    g_current_state.state = KALMAN_STOPPED;
+    ESP_ERROR_CHECK(esp_event_post_to(g_odometry_event_loop_handle, ODOMETRY_EVENT_BASE, ODOMETRY_STOP_EVENT, NULL, 0, portMAX_DELAY));
+    kalman_send2queue(&g_current_state);
+    ESP_LOGI(TAG, "Kalman filter stopped");
+}
+
+static void kalman_start_event_handler(void *handler_args, esp_event_base_t base, int32_t id, void *event_data)
+{
+    ESP_LOGI(TAG, "Starting up");
+
+    if (g_current_state.state == KALMAN_STARTED)
+    {
+        ESP_LOGW(TAG, "Kalman filter is already running");
+        return;
+    }
+
+    g_current_state.state = KALMAN_STARTED;
+    ESP_ERROR_CHECK(esp_event_post_to(g_odometry_event_loop_handle, ODOMETRY_EVENT_BASE, ODOMETRY_START_EVENT, NULL, 0, portMAX_DELAY));
+    kalman_send2queue(&g_current_state);
+    ESP_LOGI(TAG, "Kalman filter started");
+
+    return;
+}
+
+/* Main task*/
 static void kalman_task(void *pvParameters)
 {
     ESP_LOGI(TAG, "Initializing kalman filter task");
-    odometry_get_data_queue(&g_odometry_queue_handle);
 
     g_kalman_data_queue = xQueueCreate(4, sizeof(kalman_info_t));
-
 
     g_current_state = (kalman_info_t){
         .x = 0.0f,
@@ -150,16 +165,24 @@ static void kalman_task(void *pvParameters)
     ESP_ERROR_CHECK(esp_event_handler_register_with(g_kalman_event_loop_handle, KALMAN_EVENT_BASE, KALMAN_STOP_EVENT, kalman_stop_event_handler, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register_with(g_kalman_event_loop_handle, KALMAN_EVENT_BASE, KALMAN_START_EVENT, kalman_start_event_handler, NULL));
 
+    /* Wait for odometry to finish initializing */
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+    /* Get odometry queue */
+    while (odometry_get_data_queue(&g_odometry_queue_handle) != ESP_OK)
+    {
+        ESP_LOGW(TAG, "Retrying getting odometry queue...");
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+
+    ESP_ERROR_CHECK(odometry_get_event_loop(&g_odometry_event_loop_handle));
+
     kalman_set_state(KALMAN_READY);
     kalman_send2queue(&g_current_state);
 
     for (;;)
     {
-        if (g_is_running)
-        {
-            kalman_receive_odometry_data();
-        }
-
+        kalman_receive_odometry_data();
         vTaskDelay(pdMS_TO_TICKS(5));
     }
 }
@@ -168,5 +191,7 @@ void kalman_start_task(void)
 {
     ESP_LOGI(TAG, "Initializing kalman filter task");
 
-    xTaskCreatePinnedToCore(&kalman_task, "kalman", KALMAN_FILTER_STACK_SIZE, NULL, KALMAN_FILTER_TASK_PRIORITY, NULL, KALMAN_FILTER_CORE_ID);
+    xTaskCreatePinnedToCore(&kalman_task, "kalman", KALMAN_FILTER_STACK_SIZE, NULL, KALMAN_FILTER_TASK_PRIORITY, &g_kalman_task_pv, KALMAN_FILTER_CORE_ID);
+
+    odometry_start_task(g_kalman_task_pv);
 }

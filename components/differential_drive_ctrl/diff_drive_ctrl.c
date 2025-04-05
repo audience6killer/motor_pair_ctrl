@@ -24,7 +24,6 @@ static TaskHandle_t g_diff_drive_task_pv = NULL;
 static esp_event_loop_handle_t g_tract_event_handle = NULL;
 static esp_event_loop_handle_t g_diff_drive_event_handle = NULL;
 static TaskHandle_t g_parent_ptr = NULL;
-static bool g_is_running = false;
 
 static diff_drive_state_t g_diff_drive_state;
 static navigation_point_t g_current_point;
@@ -35,7 +34,7 @@ esp_err_t diff_drive_send2queue(diff_drive_state_t *state)
 {
     ESP_RETURN_ON_FALSE(diff_drive_queue_handle != NULL, ESP_ERR_INVALID_STATE, TAG, "trying to send msg to queue before init");
 
-    if (xQueueSend(diff_drive_queue_handle, state, portMAX_DELAY) != pdPASS)
+    if (xQueueSend(diff_drive_queue_handle, state, pdMS_TO_TICKS(100)) != pdPASS)
     {
         ESP_LOGE(TAG, "Error sending queue");
         return ESP_FAIL;
@@ -218,30 +217,33 @@ esp_err_t diff_drive_post_to_tract(tract_ctrl_cmd_t cmd)
     return ESP_OK;
 }
 
+/* Event handlers */
 static void diff_drive_start_event_handle(void *handler_args, esp_event_base_t base, int32_t id, void *event_data)
 {
-    if (g_is_running == true)
+    if (g_diff_drive_state.state == DD_STOPPED || g_diff_drive_state.state == DD_READY)
+    {
+        ESP_ERROR_CHECK(esp_event_post_to(g_tract_event_handle, TRACT_EVENT_BASE, TRACT_CTRL_CMD_START, NULL, 0, pdMS_TO_TICKS(10)));
+        diff_drive_set_state(DD_STARTED);
+        diff_drive_send2queue(&g_diff_drive_state);
+        ESP_LOGI(TAG, "Diff drive started");
+    }
+    else
     {
         ESP_LOGW(TAG, "Diff drive has already started!");
-        return;
     }
-
-    g_is_running = true;
-    diff_drive_set_state(DD_STARTED);
-    diff_drive_send2queue(&g_diff_drive_state);
 }
 
 static void diff_drive_stop_event_handle(void *handler_args, esp_event_base_t base, int32_t id, void *event_data)
 {
-    if (g_is_running == false)
+    if (g_diff_drive_state.state == DD_STOPPED)
     {
         ESP_LOGW(TAG, "Diff drive is already stopped!");
         return;
     }
 
-    g_is_running = false;
     diff_drive_set_state(DD_STOPPED);
     diff_drive_send2queue(&g_diff_drive_state);
+    ESP_LOGI(TAG, "Diff drive stopped");
 }
 
 static void diff_drive_receive_point_event_handle(void *handler_args, esp_event_base_t base, int32_t id, void *event_data)
@@ -277,7 +279,7 @@ esp_err_t diff_drive_receive_kalman_info(QueueHandle_t *kalman_queue_handle)
     if (xQueueReceive(*kalman_queue_handle, &vehicle_pose, pdMS_TO_TICKS(100)) == pdPASS)
     {
 
-#if true
+#if false
         const char *state = kalman_state_to_name(vehicle_pose.state);
         printf("/*x,%f,xd,%f,y,%f,yd,%f,theta,%f,thetad,%f,state,%s*/\r\n", vehicle_pose.x, g_current_point.x, vehicle_pose.y, g_current_point.y, vehicle_pose.theta, g_current_point.theta, state);
 #endif
@@ -286,7 +288,7 @@ esp_err_t diff_drive_receive_kalman_info(QueueHandle_t *kalman_queue_handle)
     }
     else
     {
-        ESP_LOGE(TAG, "Failed to receive queue");
+        ESP_LOGE(TAG, "Failed to receive kalman data");
         return ESP_FAIL;
     }
 
@@ -297,7 +299,7 @@ esp_err_t diff_drive_init(void)
 {
     ESP_RETURN_ON_FALSE(diff_drive_handle != NULL, ESP_ERR_INVALID_STATE, "TAG", "diff_drive_handle is null when calculating pos control");
 
-    ESP_LOGI(TAG, "Initatilizing navigation unit");
+    ESP_LOGI(TAG, "Initatilizing PID parameters");
     pid_ctrl_parameter_t diff_drive_pos_pid_runtime_param = {
         .kp = DIFF_DRIVE_POS_KP,
         .kd = DIFF_DRIVE_POS_KD,
@@ -343,6 +345,8 @@ static void diff_drive_task(void *pvParameters)
 {
     ESP_LOGI(TAG, "Initializing diff drive task. Waiting for traction to finish initializing.");
 
+    diff_drive_queue_handle = xQueueCreate(4, sizeof(diff_drive_state_t));
+
     // Wait for traction task to be initialized
     ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(100));
     ESP_LOGI(TAG, "Traction finished initializing");
@@ -356,8 +360,6 @@ static void diff_drive_task(void *pvParameters)
         .x = 0.0f,
         .y = 0.0f,
     };
-
-    diff_drive_queue_handle = xQueueCreate(4, sizeof(diff_drive_state_t));
 
     QueueHandle_t kalman_data_queue_handle = NULL;
 
@@ -405,7 +407,7 @@ static void diff_drive_task(void *pvParameters)
 
     for (;;)
     {
-        if (g_is_running)
+        if (g_diff_drive_state.state != DD_STOPPED && g_diff_drive_state.state != DD_READY)
         {
             diff_drive_receive_kalman_info(&kalman_data_queue_handle);
         }

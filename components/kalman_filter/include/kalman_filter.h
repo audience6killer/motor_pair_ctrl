@@ -9,7 +9,7 @@
 ESP_EVENT_DECLARE_BASE(KALMAN_EVENT_BASE);
 
 typedef enum {
-    KALMAN_RUNNING = 0,
+    KALMAN_STARTED = 0,
     KALMAN_STOPPED,
     KALMAN_READY,
 } kalman_state_e;
@@ -34,7 +34,7 @@ typedef enum {
 
 static inline const char* kalman_state_to_name(kalman_state_e state)
 {
-    static const char *states[] = {"RUNNING", "STOPPED", "READY"}; 
+    static const char *states[] = {"KF_STARTED", "KF_STOPPED", "KF_READY"}; 
     
     return states[state];
 }
@@ -43,6 +43,8 @@ esp_err_t kalman_initialize_info(kalman_info_t *data);
 
 esp_err_t kalman_get_data_queue(QueueHandle_t *handle);
 
+esp_err_t kalman_get_event_loop(esp_event_loop_handle_t *handle);
+
 void kalman_start_task(void);
 
-#endif
+#endif // KALMAN_FILTER_H
