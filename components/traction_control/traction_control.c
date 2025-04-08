@@ -22,9 +22,9 @@
 static const char TAG[] = "tract_ctrl";
 
 ESP_EVENT_DEFINE_BASE(TRACT_EVENT_BASE);
+EventGroupHandle_t tract_ctrl_event_group_handle = NULL;
 
 static esp_event_loop_handle_t g_event_loop = NULL;
-static TaskHandle_t *parent_task = NULL;
 static motor_pair_handle_t *traction_handle = NULL;
 static QueueHandle_t g_traction_data_queue;
 static motor_pair_data_t g_traction_state;
@@ -73,8 +73,18 @@ esp_err_t tract_ctrl_get_event_loop_handle(esp_event_loop_handle_t *handle)
     return ESP_OK;
 }
 
+esp_err_t tract_ctrl_send_event_bits(tract_ctrl_event_e event_bits)
+{
+    // ESP_RETURN_ON_FALSE(tract_ctrl_event_group_handle != NULL, ESP_ERR_INVALID_STATE, TAG, "Event group handle is NULL");
+    // xEventGroupClearBits(tract_ctrl_event_group_handle, 0xFFFFFFFF);
+    xEventGroupSetBits(tract_ctrl_event_group_handle, event_bits);
+
+    return ESP_OK;
+}
+
 static void traction_pid_loop_cb(void *args)
 {
+    ESP_LOGI(TAG, "Inside loop");
     static int motor_left_last_pulse_count = 0;
     static int motor_right_last_pulse_count = 0;
     static motor_pair_state_e last_traction_state = STOPPED;
@@ -108,20 +118,16 @@ static void traction_pid_loop_cb(void *args)
 
         switch (g_traction_state.state)
         {
+        case MP_READY:
         case BRAKE:
             ESP_ERROR_CHECK(bdc_motor_brake(traction_handle->motor_left_ctx.motor));
             ESP_ERROR_CHECK(bdc_motor_brake(traction_handle->motor_right_ctx.motor));
-            ESP_LOGI(TAG, "tract_ctrl_STATE: BREAK");
+            ESP_LOGI(TAG, "tract_ctrl_STATE: BREAK/READY");
             break;
         case COAST:
             ESP_ERROR_CHECK(bdc_motor_coast(traction_handle->motor_left_ctx.motor));
             ESP_ERROR_CHECK(bdc_motor_coast(traction_handle->motor_right_ctx.motor));
             ESP_LOGI(TAG, "tract_ctrl_STATE: COAST");
-            break;
-        case STARTING:
-            ESP_ERROR_CHECK(bdc_motor_forward(traction_handle->motor_left_ctx.motor));
-            ESP_ERROR_CHECK(bdc_motor_forward(traction_handle->motor_right_ctx.motor));
-            ESP_LOGI(TAG, "tract_ctrl_STATE: STARTING");
             break;
         case FORWARD:
             ESP_ERROR_CHECK(bdc_motor_forward(traction_handle->motor_left_ctx.motor));
@@ -153,9 +159,6 @@ static void traction_pid_loop_cb(void *args)
             ESP_ERROR_CHECK(bdc_motor_forward(traction_handle->motor_right_ctx.motor));
             ESP_LOGI(TAG, "tract_ctrl_STATE: RIGHT REVERSE");
             break;
-        case MP_READY:
-            ESP_LOGI(TAG, "tract_ctrl_STATE: READY!");
-            break;
         default:
             ESP_LOGI(TAG, "tract_ctrl_STATE: ERRORRRRRRRRR");
             break;
@@ -163,7 +166,7 @@ static void traction_pid_loop_cb(void *args)
     }
 
     // If the vehicle is in break or coast state, its not necessary to calculate the PID value
-    if (last_traction_state != BRAKE && last_traction_state != COAST)
+    if (last_traction_state != BRAKE && last_traction_state != COAST && last_traction_state != MP_READY)
     {
         // Calculate speed error
         float motor_left_error = traction_handle->motor_left_ctx.desired_speed - motor_left_abs_pulses;
@@ -171,6 +174,9 @@ static void traction_pid_loop_cb(void *args)
 
         float motor_right_new_speed = 0;
         float motor_left_new_speed = 0;
+
+        // ESP_LOGI(TAG, "Motor Left Error: %f, Motor Right Error: %f", motor_left_error, motor_right_error);
+        // ESP_LOGI(TAG, "Motor Left New Speed: %f, Motor Right New Speed: %f", motor_left_new_speed, motor_right_new_speed);
 
         // Set the new speed
         pid_compute(traction_handle->motor_right_ctx.pid_ctrl, motor_right_error, &motor_right_new_speed);
@@ -208,7 +214,7 @@ esp_err_t tract_ctrl_send2data_queue(motor_pair_data_t *data)
 
     if (ret != pdTRUE)
         return ret;
-    
+
     return ESP_OK;
 }
 
@@ -228,16 +234,20 @@ esp_err_t tract_ctrl_set_speed(float mleft_speed, float mright_speed)
 
     if (mleft_abs <= TRACT_MOTOR_MAX_REVS && mright_abs <= TRACT_MOTOR_MAX_REVS)
     {
-        if (mleft_speed < 0.0f && mright_speed < 0.0f)
-            tract_ctrl_set_state(REVERSE);
-        else if (mleft_speed < 0.0f && mright_speed >= 0.0f)
+        if (mleft_speed == 0.0f && mright_speed == 0.0f)
+            tract_ctrl_set_state(BRAKE);
+        else if (mleft_speed == 0.0f && mright_speed < 0.0f)
+            tract_ctrl_set_state(TURN_LEFT_REVERSE);
+        else if (mleft_speed <= 0.0f && mright_speed > 0.0f)
             tract_ctrl_set_state(TURN_LEFT_FORWARD);
-        else if (mleft_speed >= 0.0f && mright_speed < 0.0f)
+        else if (mleft_speed < 0.0f && mright_speed == 0.0f)
+            tract_ctrl_set_state(TURN_RIGHT_REVERSE);
+        else if (mleft_speed < 0.0f && mright_speed < 0.0f)
+            tract_ctrl_set_state(REVERSE);
+        else if (mleft_speed > 0.0f && mright_speed <= 0.0f)
             tract_ctrl_set_state(TURN_RIGHT_FORWARD);
         else if (mleft_speed > 0.0f && mright_speed > 0.0f)
             tract_ctrl_set_state(FORWARD);
-        else
-            tract_ctrl_set_state(BRAKE);
 
         motor_pair_set_speed((int)roundf(TRACT_CONV_REV2PULSES(mleft_abs)), (int)roundf(TRACT_CONV_REV2PULSES(mright_abs)), traction_handle);
     }
@@ -272,8 +282,11 @@ static void tract_ctrl_stop_event_handler(void *handler_args, esp_event_base_t b
     pid_reset_ctrl_block(traction_handle->motor_left_ctx.pid_ctrl);
     pid_reset_ctrl_block(traction_handle->motor_right_ctx.pid_ctrl);
 
-    ESP_LOGI(TAG, "Stopping motor speed loop");
+    ESP_LOGE(TAG, "Stopping motor speed loop");
     ESP_ERROR_CHECK(esp_timer_stop(g_traction_pid_timer));
+
+    /* Notify that the task stopped */
+    tract_ctrl_send_event_bits(TRACT_EVENT_BIT_STOPPED);
     return;
 }
 
@@ -291,8 +304,13 @@ static void tract_ctrl_start_event_handler(void *handler_args, esp_event_base_t 
         return;
     }
 
-    ESP_LOGI(TAG, "Starting motor speed loop");
     ESP_ERROR_CHECK(esp_timer_start_periodic(g_traction_pid_timer, BDC_PID_LOOP_PERIOD_MS * 1000));
+    ESP_LOGE(TAG, "PID loop started!");
+
+    ESP_LOGI(TAG, "Started timers, time since boot: %lld us", esp_timer_get_time());
+
+    /* Notify that the task started */
+    tract_ctrl_send_event_bits(TRACT_EVENT_BIT_STARTED);
 }
 
 static void tract_ctrl_set_speed_event_handler(void *handler_args, esp_event_base_t base, int32_t id, void *event_data)
@@ -318,16 +336,16 @@ static void tract_ctrl_set_speed_event_handler(void *handler_args, esp_event_bas
         return;
     }
 
-    float mleft_speed = data[0];
-    float mright_speed = data[1];
-
-    // TODO: Some kind of error handling
-    tract_ctrl_set_speed(mleft_speed, mright_speed);
+    if (tract_ctrl_set_speed(data[0], data[1]) != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Speed set was out of bounds");
+    }
 }
-
 
 static void tract_ctrl_task(void *pvParameters)
 {
+    ESP_LOGI(TAG, "Initializing tract task");
+
     // Initialize traction_handle
     traction_handle = (motor_pair_handle_t *)malloc(sizeof(motor_pair_handle_t));
     strcpy(traction_handle->id, "tract_ctrl_pair");
@@ -340,7 +358,7 @@ static void tract_ctrl_task(void *pvParameters)
             .motor_pwma_gpio_num = TRACT_ML_PWMA,
             .motor_pwmb_gpio_num = TRACT_ML_PWMB,
             .pwm_freq_hz = TRACT_MOTORS_PWM_FREQ,
-            .motor_id = "traction_left",
+            .motor_id = "tract_left",
             .pid_config = {
                 .kp = TRACT_ML_KP,
                 .kd = TRACT_ML_KD,
@@ -353,7 +371,7 @@ static void tract_ctrl_task(void *pvParameters)
             .motor_pwma_gpio_num = TRACT_MR_PWMA,
             .motor_pwmb_gpio_num = TRACT_MR_PWMB,
             .pwm_freq_hz = TRACT_MOTORS_PWM_FREQ,
-            .motor_id = "traction_right",
+            .motor_id = "tract_right",
             .pid_config = {
                 .kp = TRACT_MR_KP,
                 .kd = TRACT_MR_KD,
@@ -374,7 +392,7 @@ static void tract_ctrl_task(void *pvParameters)
 
     // Setting up timer
     const esp_timer_create_args_t traction_timer_args = {
-        .callback = traction_pid_loop_cb,
+        .callback = &traction_pid_loop_cb,
         .arg = NULL,
         .name = "traction_pid_loop",
     };
@@ -398,15 +416,16 @@ static void tract_ctrl_task(void *pvParameters)
     tract_ctrl_set_speed(initial_speed, initial_speed);
 
     // Setting up queue
-    g_traction_data_queue = xQueueCreate(20, sizeof(motor_pair_data_t));
+    g_traction_data_queue = xQueueCreate(10, sizeof(motor_pair_data_t));
 
     // TODO: Set event loop correct values
     esp_event_loop_args_t event_loop_args = {
-        .queue_size = 10,
-        .task_name = "event_loop_task",
+        .queue_size = 5,
+        .task_name = "tract_evlp",
         .task_priority = 5,
         .task_stack_size = 2084,
-        .task_core_id = 0};
+        .task_core_id = 0,
+    };
 
     ESP_ERROR_CHECK(esp_event_loop_create(&event_loop_args, &g_event_loop));
 
@@ -415,28 +434,21 @@ static void tract_ctrl_task(void *pvParameters)
     ESP_ERROR_CHECK(esp_event_handler_register_with(g_event_loop, TRACT_EVENT_BASE, TRACT_CTRL_CMD_STOP, tract_ctrl_stop_event_handler, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register_with(g_event_loop, TRACT_EVENT_BASE, TRACT_CTRL_CMD_SET_SPEED, tract_ctrl_set_speed_event_handler, NULL));
 
-    /* Notify tasks end of initialization */
-    tract_ctrl_set_state(MP_READY);
-    if(tract_ctrl_send2data_queue(&g_traction_state) != ESP_OK)
-    {
-        ESP_LOGE(TAG, "Error sending data to queue");
-    }
-
-    /* Notify the parent task the end of initialization */
-    if (parent_task != NULL)
-        xTaskNotifyGive(*parent_task);
+    /* Notify the related tasks the end of initialization */
+    tract_ctrl_send_event_bits(TRACT_EVENT_BIT_READY);
 
     for (;;)
     {
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 
-void tract_ctrl_start_task(TaskHandle_t *parent)
+void tract_ctrl_start_task(void)
 {
-    ESP_LOGI(TAG, "Initializing tract_ctrl task");
+    ESP_LOGI(TAG, "Starting tract_ctrl task");
 
-    parent_task = parent;
+    /* Initialize event group */
+    tract_ctrl_event_group_handle = xEventGroupCreate();
 
     xTaskCreatePinnedToCore(&tract_ctrl_task,
                             "tract_ctrl",

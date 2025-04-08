@@ -116,5 +116,5 @@ void test_diff_drive_task_start(void)
 
     xTaskCreatePinnedToCore(&test_diff_drive_task, "test_diff_drive", 4096, NULL, 10, &parent, 0);
 
-    diff_drive_task_start(parent);
+    diff_drive_task_start();
 }

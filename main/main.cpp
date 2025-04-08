@@ -1,28 +1,32 @@
 extern "C"
 {
-    // #include "traction_control.h"
+#include "traction_control.h"
     //  #include "test_traction_control.h"
 #include "kalman_filter.h"
 #include "odometry_unit.h"
-    // #include "diff_drive_ctrl.h"
+#include "diff_drive_ctrl.h"
     // #include "waypoint_controller.h"
     //  #include "seed_planter_control.h"
     //  #include "test_seed_planter.h"
     //    #include "test_diff_drive.h"
 }
 
+#include "waypoint_controller.h"
 #include "test_waypoint_follower.h"
 #include "Arduino.h"
 
-    extern "C" void
-    app_main(void)
+extern "C" void
+app_main(void)
 {
     initArduino();
 
     Serial.begin(115200);
 
-    //odometry_start_task(NULL);
+    /* The order of initialization must be followed*/
+    tract_ctrl_start_task();
     kalman_start_task();
+    diff_drive_task_start();
+    waypoint_ctrl_start_task();
     test_waypoint_follower_task_start();
     // test_diff_drive_task_start();
     // tract_ctrl_start_task();

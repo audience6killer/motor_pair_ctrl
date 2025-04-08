@@ -2,7 +2,7 @@
 #define WAYPOINT_CTRL_TASK_COMMON_H
 
 #define WAYPOINT_CTRL_STACK_SIZE      9046
-#define WAYPOINT_CTRL_CORE_ID         0
+#define WAYPOINT_CTRL_CORE_ID         1
 #define WAYPOINT_CTRL_PRIORITY        8
 
 #define WAYPOINT_CTRL_NXT_POINT_WAIT  1E6     // 1 second

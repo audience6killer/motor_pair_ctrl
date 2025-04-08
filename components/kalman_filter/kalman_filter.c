@@ -49,10 +49,7 @@ esp_err_t kalman_send2queue(kalman_info_t *data)
 
     ESP_RETURN_ON_FALSE(data != NULL, ESP_ERR_INVALID_STATE, TAG, "Null data to send to queue");
 
-    if (xQueueSend(g_kalman_data_queue, data, portMAX_DELAY) != pdPASS)
-    {
-        ESP_LOGE(TAG, "Error sending queue");
-    }
+    xQueueSend(g_kalman_data_queue, data, pdMS_TO_TICKS(100)); 
 
     return ESP_OK;
 }
@@ -76,7 +73,7 @@ void kalman_receive_odometry_data(void)
 
     if (g_current_state.state == KALMAN_STARTED)
     {
-        if (xQueueReceive(g_odometry_queue_handle, &odo_robot_pose, portMAX_DELAY) == pdPASS)
+        if (xQueueReceive(g_odometry_queue_handle, &odo_robot_pose, pdMS_TO_TICKS(100)) == pdPASS)
         {
             g_current_state = (kalman_info_t){
                 .x = odo_robot_pose.x.cur_value,
@@ -110,7 +107,7 @@ static void kalman_stop_event_handler(void *handler_args, esp_event_base_t base,
     }
 
     g_current_state.state = KALMAN_STOPPED;
-    ESP_ERROR_CHECK(esp_event_post_to(g_odometry_event_loop_handle, ODOMETRY_EVENT_BASE, ODOMETRY_STOP_EVENT, NULL, 0, portMAX_DELAY));
+    ESP_ERROR_CHECK(esp_event_post_to(g_odometry_event_loop_handle, ODOMETRY_EVENT_BASE, ODOMETRY_STOP_EVENT, NULL, 0, pdMS_TO_TICKS(100)));
     kalman_send2queue(&g_current_state);
     ESP_LOGI(TAG, "Kalman filter stopped");
 }
@@ -126,7 +123,7 @@ static void kalman_start_event_handler(void *handler_args, esp_event_base_t base
     }
 
     g_current_state.state = KALMAN_STARTED;
-    ESP_ERROR_CHECK(esp_event_post_to(g_odometry_event_loop_handle, ODOMETRY_EVENT_BASE, ODOMETRY_START_EVENT, NULL, 0, portMAX_DELAY));
+    ESP_ERROR_CHECK(esp_event_post_to(g_odometry_event_loop_handle, ODOMETRY_EVENT_BASE, ODOMETRY_START_EVENT, NULL, 0, pdMS_TO_TICKS(50)));
     kalman_send2queue(&g_current_state);
     ESP_LOGI(TAG, "Kalman filter started");
 

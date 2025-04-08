@@ -17,6 +17,7 @@ extern "C"
 #include "esp_check.h"
 #include "esp_timer.h"
 #include "esp_event.h"
+#include "freertos/event_groups.h"
 
 #include "waypoint_controller.h"
 #include "waypoint_controller_task_common.h"
@@ -31,7 +32,6 @@ static QueueHandle_t g_waypoint_queue_handle = NULL;
 static QueueHandle_t g_diff_drive_queue = NULL;
 static diff_drive_state_t g_diff_drive_state;
 static TaskHandle_t g_waypoint_task_pv = NULL;
-static TaskHandle_t g_parent_ptr = NULL;
 static esp_event_loop_handle_t g_waypoint_event_handle = NULL;
 static esp_event_loop_handle_t g_diff_drive_event_handle = NULL;
 static std::queue<navigation_point_t> g_navigation_points;
@@ -64,7 +64,7 @@ esp_err_t waypoint_ctrl_send2queue(waypoint_ctrl_state_e state)
     ESP_RETURN_ON_FALSE(g_waypoint_queue_handle != NULL, ESP_ERR_INVALID_STATE, TAG, "trying to send msg when queue is null");
 
     g_waypoint_state = state;
-    if (xQueueSend(g_waypoint_queue_handle, &state, portMAX_DELAY) != pdPASS)
+    if (xQueueSend(g_waypoint_queue_handle, &state, pdMS_TO_TICKS(100)) != pdPASS)
     {
         ESP_LOGE(TAG, "Error sending to queue");
         return ESP_FAIL;
@@ -81,25 +81,22 @@ esp_err_t waypoint_ctrl_add_point(float x, float y, float theta)
 
 void waypoint_ctrl_trajectory_ctrl(void *args)
 {
-    diff_drive_state_t state = *(diff_drive_state_t *)args;
-
-    if (state.state == DD_POINT_REACHED)
+    if (g_navigation_points.size() > 0)
     {
-        if (g_navigation_points.size() > 0)
-        {
-            navigation_point_t point = g_navigation_points.front();
-            g_navigation_points.pop();
-            ESP_ERROR_CHECK(esp_event_post_to(g_diff_drive_event_handle, DIFF_DRIVE_EVENT_BASE, DIFF_DRIVE_RECEIVE_POINT_EVENT, &point, sizeof(point), portMAX_DELAY));
-            // diff_drive_set_navigation_point(point);
-            ESP_ERROR_CHECK(waypoint_ctrl_send2queue(WP_NAVIGATING));
-            ESP_LOGI(TAG, "Next point in trajectory sended: (%.4f, %.4f, %.4f)", point.x, point.y, point.theta);
-        }
+        navigation_point_t point = g_navigation_points.front();
+        g_navigation_points.pop();
+        ESP_ERROR_CHECK(esp_event_post_to(g_diff_drive_event_handle, DIFF_DRIVE_EVENT_BASE, DIFF_DRIVE_RECEIVE_POINT_EVENT, &point, sizeof(point), portMAX_DELAY));
+        // diff_drive_set_navigation_point(point);
+        if(g_waypoint_state != WP_NAVIGATING)
+            ESP_ERROR_CHECK_WITHOUT_ABORT( waypoint_ctrl_send2queue(WP_NAVIGATING) );
 
-        else
-        {
-            ESP_LOGI(TAG, "Trajectory finished!");
-            ESP_ERROR_CHECK(waypoint_ctrl_send2queue(WP_TRJ_FINISHED));
-        }
+        ESP_LOGI(TAG, "Next point in trajectory sended: (%.4f, %.4f, %.4f)", point.x, point.y, point.theta);
+    }
+
+    else
+    {
+        ESP_LOGI(TAG, "Trajectory finished!");
+        waypoint_ctrl_send2queue(WP_TRJ_FINISHED);
     }
 }
 
@@ -114,8 +111,11 @@ esp_err_t waypoint_ctrl_start_trajectory(void)
         }
 
         ESP_LOGI(TAG, "Starting trajectory");
-        ESP_ERROR_CHECK(esp_event_post_to(g_diff_drive_event_handle, DIFF_DRIVE_EVENT_BASE, DIFF_DRIVE_START_EVENT, NULL, 0, portMAX_DELAY));
+        ESP_ERROR_CHECK(esp_event_post_to(g_diff_drive_event_handle, DIFF_DRIVE_EVENT_BASE, DIFF_DRIVE_START_EVENT, NULL, 0, pdMS_TO_TICKS(200)));
         waypoint_ctrl_send2queue(WP_NAVIGATING);
+
+        // Send first point
+        //waypoint_ctrl_trajectory_ctrl(NULL);
 
         return ESP_OK;
     }
@@ -151,7 +151,7 @@ static void waypoint_stop_event_handler(void *handler_args, esp_event_base_t bas
     }
 
     ESP_LOGI(TAG, "Stopping waypoint controller");
-    ESP_ERROR_CHECK(esp_event_post_to(g_diff_drive_event_handle, DIFF_DRIVE_EVENT_BASE, DIFF_DRIVE_STOP_EVENT, NULL, 0, portMAX_DELAY));
+    ESP_ERROR_CHECK(esp_event_post_to(g_diff_drive_event_handle, DIFF_DRIVE_EVENT_BASE, DIFF_DRIVE_STOP_EVENT, NULL, 0, pdMS_TO_TICKS(200)));
     waypoint_ctrl_set_state(WP_STOPPED);
     waypoint_ctrl_send2queue(g_waypoint_state);
 }
@@ -167,28 +167,48 @@ static void waypoint_start_event_handler(void *handler_args, esp_event_base_t ba
         ESP_LOGE(TAG, "Error starting trajectory. Code: %s", esp_err_to_name(ret));
         return;
     }
+
+    /* Wait for started bit on the diff drive task */
+    EventBits_t bits = xEventGroupWaitBits(diff_drive_event_group_handle, DD_STARTED, pdTRUE, pdTRUE, pdMS_TO_TICKS(200));
+
+    if ((bits & DD_STARTED) == 0)
+    {
+        ESP_LOGE(TAG, "Error receiving started flag from diff drive");
+        return;
+    }
+
+    ESP_LOGI(TAG, "Sending first point!");
+    waypoint_ctrl_trajectory_ctrl(NULL);
+
 }
 
 esp_err_t waypoint_ctrl_receive_from_diff_drive(void)
 {
     if (g_waypoint_state == WP_NAVIGATING)
     {
-        if (xQueueReceive(g_diff_drive_queue, &g_diff_drive_state, portMAX_DELAY) == pdPASS)
+        EventBits_t bits = xEventGroupWaitBits(diff_drive_event_group_handle, DD_POINT_REACHED, pdTRUE, pdTRUE, 0);
+        if ((bits & DD_POINT_REACHED) != 0)
         {
-            if (g_diff_drive_state.state == DD_POINT_REACHED)
-            {
-                if (!esp_timer_is_active(g_next_point_timer))
-                {
-                    ESP_LOGI(TAG, "Point reached. Starting timer");
-                    ESP_ERROR_CHECK(esp_timer_start_once(g_next_point_timer, WAYPOINT_CTRL_NXT_POINT_WAIT));
-                    ESP_ERROR_CHECK(waypoint_ctrl_send2queue(WP_WAITING));
-                }
-            }
-        }
-        else
-        {
-            ESP_LOGE(TAG, "Error receiving from diff drive queue");
-            return ESP_FAIL;
+            ESP_LOGW(TAG, "Point reached. Starting timer");
+
+            waypoint_ctrl_trajectory_ctrl(NULL);
+            // ESP_ERROR_CHECK(esp_timer_start_once(g_next_point_timer, WAYPOINT_CTRL_NXT_POINT_WAIT));
+
+            // uint64_t current_time = esp_timer_get_time(); // Get the current time
+            // uint64_t expiry_time = 0;
+            // ESP_ERROR_CHECK(esp_timer_get_expiry_time(g_next_point_timer, &expiry_time)); // Get the expiry time
+
+            // if (expiry_time > current_time)
+            //{
+            //     uint64_t remaining_time = expiry_time - current_time;       // Calculate remaining time
+            //     printf("Remaining time: %llu ms\n", remaining_time / 1000); // Convert to milliseconds
+            // }
+            // else
+            //{
+            //     printf("Timer has already expired or invalid expiry time\n");
+            // }
+
+            //waypoint_ctrl_send2queue(WP_NAVIGATING);
         }
     }
     return ESP_OK;
@@ -201,8 +221,8 @@ static void waypoint_ctrl_task(void *pvParameters)
     g_waypoint_queue_handle = xQueueCreate(4, sizeof(navigation_point_t));
 
     /* wait for diff drive to finish initializing */
-    ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(100));
-    ESP_LOGI(TAG, "Traction finished initializing");
+    xEventGroupWaitBits(diff_drive_event_group_handle, DD_READY, pdTRUE, pdTRUE, portMAX_DELAY);
+    // ESP_LOGI(TAG, "Traction finished initializing");
 
     /* Get a reference to the diff drive data queue */
     ESP_ERROR_CHECK(diff_drive_get_queue_handle(&g_diff_drive_queue));
@@ -211,17 +231,15 @@ static void waypoint_ctrl_task(void *pvParameters)
     /* Timer to wait for the next point */
     esp_timer_create_args_t next_point_timer_args = {
         .callback = &waypoint_ctrl_trajectory_ctrl,
-        .arg = &g_diff_drive_state,
-        .dispatch_method = ESP_TIMER_TASK,
         .name = "next_point_timer",
-        .skip_unhandled_events = false};
+    };
 
     ESP_ERROR_CHECK(esp_timer_create(&next_point_timer_args, &g_next_point_timer));
 
     /* Setting up event loop */
     esp_event_loop_args_t event_loop_args = {
         .queue_size = 10,
-        .task_name = "waypoint_event_loop",
+        .task_name = "wp_event_loop",
         .task_priority = 5,
         .task_stack_size = 4084,
         .task_core_id = 0,
@@ -235,12 +253,10 @@ static void waypoint_ctrl_task(void *pvParameters)
     ESP_ERROR_CHECK(esp_event_handler_register_with(g_waypoint_event_handle, WAYPOINT_EVENT_BASE, WP_ADD_POINT_EVENT, waypoint_add_point_event_handler, NULL));
 
     /* Notify end of initialization */
-    if (g_parent_ptr != NULL)
-        xTaskNotifyGive(g_parent_ptr);
 
-    waypoint_ctrl_set_state(WP_READY);
-    waypoint_ctrl_send2queue(g_waypoint_state);
-    
+    //waypoint_ctrl_set_state(WP_READY);
+    waypoint_ctrl_send2queue(WP_READY);
+
     for (;;)
     {
         waypoint_ctrl_receive_from_diff_drive();
@@ -249,14 +265,9 @@ static void waypoint_ctrl_task(void *pvParameters)
     }
 }
 
-void waypoint_ctrl_start_task(TaskHandle_t parent)
+void waypoint_ctrl_start_task(void)
 {
     ESP_LOGI(TAG, "Iniatilizing task");
 
-    if (parent != NULL)
-        g_parent_ptr = parent;
-
-    xTaskCreatePinnedToCore(&waypoint_ctrl_task, "waypoint_ctrl", WAYPOINT_CTRL_STACK_SIZE, NULL, WAYPOINT_CTRL_PRIORITY, &g_waypoint_task_pv, WAYPOINT_CTRL_CORE_ID);
-
-    diff_drive_task_start(g_waypoint_task_pv);
+    xTaskCreatePinnedToCore(&waypoint_ctrl_task, "waypoint_ctrl", WAYPOINT_CTRL_STACK_SIZE, NULL, WAYPOINT_CTRL_PRIORITY, NULL, WAYPOINT_CTRL_CORE_ID);
 }

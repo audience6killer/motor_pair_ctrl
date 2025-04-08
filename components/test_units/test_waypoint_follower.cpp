@@ -17,12 +17,12 @@ extern "C"
 
 #include "test_waypoint_follower.h"
 
-#define CORE_ID 0
+#define CORE_ID 1
 #define STACK_SIZE 4096
 #define PRIORITY 2
 
+/* Static variables */
 static const char TAG[] = "test_waypoint_task";
-static TaskHandle_t g_test_task_pv = NULL;
 static esp_event_loop_handle_t g_waypoint_event_handle = NULL;
 static QueueHandle_t g_waypoint_queue_handle = NULL;
 static QueueHandle_t g_kalman_data_queue = NULL;
@@ -92,10 +92,6 @@ static void test_waypoint_task(void *pvParemeters)
 {
     ESP_LOGI(TAG, "Initializing waypoint test. Waiting for waypoint task to finish");
 
-    /* Wait for waypoint to end initializing*/
-    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-    ESP_LOGI(TAG, "Waypoint finished initializing");
-
     esp_event_loop_handle_t kalman_event_loop = NULL;
     ESP_ERROR_CHECK(kalman_get_event_loop(&kalman_event_loop));
 
@@ -123,6 +119,9 @@ static void test_waypoint_task(void *pvParemeters)
     ESP_LOGI(TAG, "Waiting for start signal");
 
     // ESP_ERROR_CHECK(esp_event_post_to(g_waypoint_event_handle, WAYPOINT_EVENT_BASE, WP_START_EVENT, NULL, 0, portMAX_DELAY));
+    /* Start kalman data sending */
+    ESP_ERROR_CHECK(esp_event_post_to(kalman_event_loop, KALMAN_EVENT_BASE, KALMAN_START_EVENT, NULL, 0, pdMS_TO_TICKS(10)));
+    // start_test_waypoint_follower();
 
     for (;;)
     {
@@ -134,22 +133,26 @@ static void test_waypoint_task(void *pvParemeters)
                 ESP_LOGI(TAG, "Starting waypoint follower");
 
                 navigation_point_t point = {
+                    .x = 0.0f,
+                    .y = 0.0f,
+                    .theta = 0.0f,
+                };
+                navigation_point_t point2 = {
                     .x = 10.0f,
-                    .y = 100.0f,
-                    .theta = 30.0f,
+                    .y = 0.0f,
+                    .theta = 0.0f,
                 };
                 ESP_ERROR_CHECK(esp_event_post_to(g_waypoint_event_handle, WAYPOINT_EVENT_BASE, WP_ADD_POINT_EVENT, &point, sizeof(point), pdMS_TO_TICKS(10)));
-                ESP_ERROR_CHECK(esp_event_post_to(g_waypoint_event_handle, WAYPOINT_EVENT_BASE, WP_START_EVENT, NULL, 0, pdMS_TO_TICKS(10)));
+                ESP_ERROR_CHECK(esp_event_post_to(g_waypoint_event_handle, WAYPOINT_EVENT_BASE, WP_ADD_POINT_EVENT, &point, sizeof(point), pdMS_TO_TICKS(10)));
+                ESP_ERROR_CHECK(esp_event_post_to(g_waypoint_event_handle, WAYPOINT_EVENT_BASE, WP_ADD_POINT_EVENT, &point2, sizeof(point2), pdMS_TO_TICKS(10)));
 
-                /* Start kalman data sending */
-                ESP_ERROR_CHECK(esp_event_post_to(kalman_event_loop, KALMAN_EVENT_BASE, KALMAN_START_EVENT, NULL, 0, pdMS_TO_TICKS(10)));
-                // start_test_waypoint_follower();
+                ESP_ERROR_CHECK(esp_event_post_to(g_waypoint_event_handle, WAYPOINT_EVENT_BASE, WP_START_EVENT, NULL, 0, pdMS_TO_TICKS(10)));
             }
         }
 
-        test_diff_drive_recive_data();
-        test_tract_receive_data();
-        test_kalman_receive_data();
+        //test_diff_drive_recive_data();
+        // test_tract_receive_data();
+        //test_kalman_receive_data();
         test_waypoint_receive_data();
 
         vTaskDelay(pdMS_TO_TICKS(1));
@@ -161,7 +164,5 @@ void test_waypoint_follower_task_start(void)
 
     ESP_LOGI(TAG, "Starting waypoint task");
 
-    xTaskCreatePinnedToCore(&test_waypoint_task, "test_waypoint", STACK_SIZE, NULL, PRIORITY, &g_test_task_pv, CORE_ID);
-
-    waypoint_ctrl_start_task(g_test_task_pv);
+    xTaskCreatePinnedToCore(&test_waypoint_task, "test_waypoint", STACK_SIZE, NULL, PRIORITY, NULL, CORE_ID);
 }

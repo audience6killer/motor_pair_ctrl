@@ -3,6 +3,7 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
+#include "freertos/event_groups.h"
 #include "esp_event.h"
 
 #ifdef __cplusplus
@@ -11,6 +12,8 @@ extern "C"
 #endif
 
     ESP_EVENT_DECLARE_BASE(WAYPOINT_EVENT_BASE);
+
+    extern EventGroupHandle_t waypoint_ctrl_event_group_handle;
 
     typedef enum
     {
@@ -55,7 +58,7 @@ extern "C"
 
     esp_err_t waypoint_ctrl_get_event_loop(esp_event_loop_handle_t *handle);
 
-    void waypoint_ctrl_start_task(TaskHandle_t parent);
+    void waypoint_ctrl_start_task(void);
 
 #ifdef __cplusplus
 }

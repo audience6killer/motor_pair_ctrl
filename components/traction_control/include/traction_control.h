@@ -13,10 +13,20 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
+#include "freertos/event_groups.h"
 #include "esp_event.h"
 #include "motor_pair_ctrl.h"
 
 ESP_EVENT_DECLARE_BASE(TRACT_EVENT_BASE);
+
+extern EventGroupHandle_t tract_ctrl_event_group_handle; 
+
+typedef enum {
+    TRACT_EVENT_BIT_STOPPED = BIT0,
+    TRACT_EVENT_BIT_READY = BIT1,
+    TRACT_EVENT_BIT_STARTED = BIT2,
+    TRACT_EVENT_BIT_ERROR = BIT3,
+} tract_ctrl_event_e;
 
 typedef enum
 {
@@ -31,6 +41,15 @@ typedef struct
     float motor_left_speed;
     float motor_right_speed;
 } tract_ctrl_cmd_t;
+
+/**
+ * @brief Set motors speed
+ * 
+ * @param mleft_speed In rev/s
+ * @param mright_speed In rev/s
+ * @return esp_err_t 
+ */
+esp_err_t tract_ctrl_set_speed(float mleft_speed, float mright_speed);
 
 /**
  * @brief Get the data queue for the traction control
@@ -51,6 +70,6 @@ esp_err_t tract_ctrl_get_event_loop_handle(esp_event_loop_handle_t *handle);
  * @brief Starts task for traction control
  *
  */
-void tract_ctrl_start_task(TaskHandle_t *parent);
+void tract_ctrl_start_task(void);
 
 #endif

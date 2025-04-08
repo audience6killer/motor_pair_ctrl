@@ -4,7 +4,7 @@
 // Right motor connected to Driver's OUT2
 
 #define TRACT_CONTROL_STACK_SIZE            4096
-#define TRACT_CONTROL_TASK_PRIORITY         12 
+#define TRACT_CONTROL_TASK_PRIORITY         30 
 #define TRACT_CONTROL_CORE_ID               0
 
 #define BDC_MCPWM_TIMER_RESOLUTION_HZ       10000000 // 10MHz, 1 tick = 0.1us

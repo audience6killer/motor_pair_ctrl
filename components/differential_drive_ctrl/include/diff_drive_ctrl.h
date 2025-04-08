@@ -1,11 +1,16 @@
 #ifndef NAVIGATION_UNIT_H
 #define NAVIGATION_UNIT_H
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/event_groups.h"
+
 #include "pid_ctrl.h"
 #include "kalman_filter.h"
 #include "esp_event.h"
 
 ESP_EVENT_DECLARE_BASE(DIFF_DRIVE_EVENT_BASE);
+
+extern EventGroupHandle_t diff_drive_event_group_handle;
 
 typedef struct
 {
@@ -16,12 +21,12 @@ typedef struct
 } diff_drive_handle_t;
 
 typedef enum {
-    DD_STOPPED,
-    DD_READY,
-    DD_STARTED,
-    DD_POINT_REACHED,
-    DD_ORIENTING,
-    DD_NAVIGATING
+    DD_STOPPED = BIT0,
+    DD_READY = BIT1,
+    DD_STARTED = BIT2,
+    DD_POINT_REACHED = BIT3,
+    DD_ORIENTING = BIT4,
+    DD_NAVIGATING = BIT5
 } diff_drive_state_e;
 
 typedef struct {
@@ -60,6 +65,6 @@ esp_err_t diff_drive_get_event_loop(esp_event_loop_handle_t *handle);
 
 esp_err_t diff_drive_get_queue_handle(QueueHandle_t *queue);
 
-void diff_drive_task_start(TaskHandle_t parent);
+void diff_drive_task_start(void);
 
 #endif

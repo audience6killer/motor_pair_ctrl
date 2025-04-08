@@ -3,6 +3,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
+#include "freertos/event_groups.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "esp_check.h"
@@ -83,10 +84,7 @@ esp_err_t odometry_send_data_to_queue(odometry_data_t *data)
 {
     ESP_RETURN_ON_FALSE(data != NULL, ESP_ERR_INVALID_STATE, TAG, "Null data to send to queue");
 
-    if (xQueueSend(g_odometry_data_queue, data, pdMS_TO_TICKS(50)) != pdPASS)
-    {
-        ESP_LOGE(TAG, "Error sending to queue");
-    }
+    xQueueSend(g_odometry_data_queue, data, pdMS_TO_TICKS(50));
 
     return ESP_OK;
 }
@@ -207,13 +205,9 @@ void odometry_receive_from_traction(void)
 
     if (g_odometry_data.odometry_state == ODO_RUNNING)
     {
-        if (xQueueReceive(g_traction_data_queue, &r_data, pdMS_TO_TICKS(100)) == pdTRUE)
+        if (xQueueReceive(g_traction_data_queue, &r_data, pdMS_TO_TICKS(30)) == pdTRUE)
         {
             ESP_ERROR_CHECK(odometry_calculate_pose(r_data));
-        }
-        else
-        {
-            ESP_LOGE(TAG, "Error receiving from traction queue");
         }
     }
 }
@@ -224,6 +218,9 @@ static void odometry_unit_task(void *pvParameters)
 
     /* Setting up data queue */
     g_odometry_data_queue = xQueueCreate(4, sizeof(odometry_data_t));
+
+    /* Wait for traction to end initializing*/
+    xEventGroupWaitBits(tract_ctrl_event_group_handle, TRACT_EVENT_BIT_READY, pdFALSE, pdTRUE, portMAX_DELAY);
 
     /* Setting up timer for odometry */
     esp_timer_create_args_t odometry_timer_args = {
