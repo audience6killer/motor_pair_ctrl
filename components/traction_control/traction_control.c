@@ -283,7 +283,7 @@ static void tract_ctrl_stop_event_handler(void *handler_args, esp_event_base_t b
     pid_reset_ctrl_block(traction_handle->motor_right_ctx.pid_ctrl);
 
     ESP_LOGE(TAG, "Stopping motor speed loop");
-    ESP_ERROR_CHECK(esp_timer_stop(g_traction_pid_timer));
+    // ESP_ERROR_CHECK(esp_timer_stop(g_traction_pid_timer));
 
     /* Notify that the task stopped */
     tract_ctrl_send_event_bits(TRACT_EVENT_BIT_STOPPED);
@@ -304,7 +304,7 @@ static void tract_ctrl_start_event_handler(void *handler_args, esp_event_base_t 
         return;
     }
 
-    ESP_ERROR_CHECK(esp_timer_start_periodic(g_traction_pid_timer, BDC_PID_LOOP_PERIOD_MS * 1000));
+    //ESP_ERROR_CHECK(esp_timer_start_periodic(g_traction_pid_timer, BDC_PID_LOOP_PERIOD_MS * 1000));
     ESP_LOGE(TAG, "PID loop started!");
 
     ESP_LOGI(TAG, "Started timers, time since boot: %lld us", esp_timer_get_time());
@@ -436,6 +436,8 @@ static void tract_ctrl_task(void *pvParameters)
 
     /* Notify the related tasks the end of initialization */
     tract_ctrl_send_event_bits(TRACT_EVENT_BIT_READY);
+
+    ESP_ERROR_CHECK(esp_timer_start_periodic(g_traction_pid_timer, BDC_PID_LOOP_PERIOD_MS * 1000));
 
     for (;;)
     {
