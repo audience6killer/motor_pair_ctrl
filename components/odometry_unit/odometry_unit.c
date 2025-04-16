@@ -34,6 +34,13 @@ esp_err_t odometry_get_data_queue(QueueHandle_t *queue)
 {
     ESP_RETURN_ON_FALSE(g_odometry_data_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue handle is NULL");
 
+    if(g_odometry_data_queue == NULL)
+    {
+        //ESP_LOGE(TAG, "Data queue is NULL while retraiving");
+
+        return ESP_FAIL;
+    }
+
     *queue = g_odometry_data_queue;
     return ESP_OK;
 }
@@ -148,7 +155,7 @@ esp_err_t odometry_stop(void)
     }
 
     ESP_LOGI(TAG, "Timer is being stopped!");
-    ESP_ERRRO_CHECK(esp_timer_stop(g_odometry_timer_handle));
+    ESP_ERROR_CHECK(esp_timer_stop(g_odometry_timer_handle));
 
     return ESP_OK;
 }

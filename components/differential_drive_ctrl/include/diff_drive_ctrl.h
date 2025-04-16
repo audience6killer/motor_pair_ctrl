@@ -13,9 +13,12 @@ typedef struct
 } diff_drive_ctrl_handle_t;
 
 typedef enum {
-    POINT_REACHED,
-    ORIENTING,
-    NAVIGATING
+    DD_STATE_STOPPED = 0,
+    DD_STATE_READY,
+    DD_STATE_STARTED,
+    DD_STATE_POINT_REACHED,
+    DD_STATE_ORIENTING,
+    DD_STATE_NAVIGATING
 } diff_drive_state_e;
 
 typedef struct {
@@ -28,18 +31,30 @@ typedef struct {
     diff_drive_state_e state;
 } diff_drive_state_t;
 
+typedef enum {
+    DD_CMD_STOP = 0,
+    DD_CMD_START,
+    DD_CMD_RECEIVE_POINT,
+} diff_drive_cmd_e;
+
 typedef struct
 {
     float x;
     float y;
     float theta;
 
-    diff_drive_state_t state;
+    //diff_drive_state_t state;
 } navigation_point_t;
 
-esp_err_t diff_drive_get_queue_handle(QueueHandle_t *queue);
+typedef struct {
+    diff_drive_cmd_e cmd;
 
-esp_err_t diff_drive_set_navigation_point(navigation_point_t point);
+    navigation_point_t *point; 
+} diff_drive_cmd_t;
+
+esp_err_t diff_drive_get_cmd_queue_handle(QueueHandle_t *queue);
+
+esp_err_t diff_drive_get_data_queue_handle(QueueHandle_t *queue);
 
 void diff_drive_ctrl_task_start(void);
 

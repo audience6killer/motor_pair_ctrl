@@ -62,7 +62,14 @@ esp_err_t kalman_send2queue(kalman_info_t *data)
 
 static void kalman_filter_task(void *pvParameters)
 {
-    QueueHandle_t odometry_queue_pv = odometry_unit_get_queue_handle();
+    QueueHandle_t odometry_queue_pv = NULL;
+
+    while(odometry_get_data_queue(&odometry_queue_pv) != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Error getting odometry data queue. Retrying...");
+        vTaskDelay(pdMS_TO_TICKS(30));
+    }
+    
     odometry_data_t odo_robot_pose;
 
     kalman_info_t nav_point = (kalman_info_t){

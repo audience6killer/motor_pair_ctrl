@@ -4,6 +4,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 
+#include "diff_drive_ctrl.h"
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -16,15 +18,24 @@ extern "C"
         WP_NAVIGATING,
         WP_WAITING,
         WP_TRJ_FINISHED,
-    } waypoint_ctrl_state_e;
+    } waypoint_state_e;
 
-    esp_err_t waypoint_ctrl_get_queue_handle(QueueHandle_t *handle);
+    typedef enum {
+        WP_CMD_START_TRAJ = 0,
+        WP_CMD_STOP_TRAJ,
+        WP_CMD_RECEIVE_POINT,
+    } waypoint_cmd_e;
 
-    esp_err_t waypoint_ctrl_add_point(float x, float y, float theta);
+    typedef struct {
+        waypoint_cmd_e cmd;
+        navigation_point_t *point;
+    } waypoint_cmd_t;
 
-    esp_err_t waypoint_ctrl_start_trajectory(void);
+    esp_err_t waypoint_get_data_queue_handle(QueueHandle_t *handle);
 
-    void waypoint_ctrl_start_task(void);
+    esp_err_t waypoint_get_cmd_queue_handle(QueueHandle_t *handle);
+
+    void waypoint_start_task(void);
 
 #ifdef __cplusplus
 }
