@@ -21,24 +21,28 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #endif
 
+typedef struct
+{
+    pid_ctrl_block_handle_t position_pid_ctrl;
+    pid_ctrl_block_handle_t orientation_pid_ctrl;
+    float vel_l; // rad/s -> rev/s
+    float vel_r;
+} diff_drive_ctrl_handle_t;
+
 /* Static variables */
 static const char TAG[] = "diff_drive_ctrl";
-static QueueHandle_t g_diff_drive_data_queue = NULL;
+static QueueHandle_t g_diff_drive_state_queue = NULL;
 static QueueHandle_t g_diff_drive_cmd_queue = NULL;
 static diff_drive_ctrl_handle_t *diff_drive_handle = NULL;
 static QueueHandle_t g_traction_cmd_queue = NULL;
 static QueueHandle_t g_kalman_data_queue;
 
-static diff_drive_state_t g_diff_drive_state;
+static diff_drive_state_e g_diff_drive_state;
+static diff_drive_err_t g_diff_drive_error;
 static navigation_point_t g_current_point;
 
 /* Function declarations */
 esp_err_t diff_drive_send2traction(tract_ctrl_cmd_t cmd);
-
-void diff_drive_set_state(diff_drive_state_e state)
-{
-    g_diff_drive_state.state = state;
-}
 
 esp_err_t diff_drive_orientation_control(float theta_error)
 {
@@ -102,15 +106,16 @@ esp_err_t diff_drive_position_control(float theta_error)
     return ESP_OK;
 }
 
-esp_err_t diff_drive_send2queue(diff_drive_state_t state)
+esp_err_t diff_drive_update_state(diff_drive_state_e state)
 {
-    diff_drive_state_t s = state;
+    ESP_RETURN_ON_FALSE(g_diff_drive_state_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "trying to send msg to queue before init");
 
-    ESP_RETURN_ON_FALSE(g_diff_drive_data_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "trying to send msg to queue before init");
+    g_diff_drive_state = state;
+    diff_drive_state_e s = g_diff_drive_state;
 
-    if (xQueueSend(g_diff_drive_data_queue, &s, pdMS_TO_TICKS(20)) != pdPASS)
+    if (xQueueSend(g_diff_drive_state_queue, &s, pdMS_TO_TICKS(20)) != pdPASS)
     {
-        ESP_LOGE(TAG, "Error sending queue");
+        ESP_LOGE(TAG, "Error sending state queue");
         return ESP_FAIL;
     }
 
@@ -119,28 +124,28 @@ esp_err_t diff_drive_send2queue(diff_drive_state_t state)
 
 esp_err_t diff_drive_point_follower(kalman_info_t *c_pose)
 {
-    g_diff_drive_state.err_y = g_current_point.y - c_pose->y;
-    g_diff_drive_state.err_x = g_current_point.x - c_pose->x;
+    g_diff_drive_error.err_y = g_current_point.y - c_pose->y;
+    g_diff_drive_error.err_x = g_current_point.x - c_pose->x;
 
-    float y_error = g_diff_drive_state.err_y;
-    float x_error = g_diff_drive_state.err_x;
+    float y_error = g_diff_drive_error.err_y;
+    float x_error = g_diff_drive_error.err_x;
 
     float theta_m = atan2f(y_error, x_error);
-    g_diff_drive_state.err_theta = theta_m - c_pose->theta;
+    g_diff_drive_error.err_theta = theta_m - c_pose->theta;
 
-    float theta_error = g_diff_drive_state.err_theta;
+    float theta_error = g_diff_drive_error.err_theta;
 
-    g_diff_drive_state.err_dist = sqrtf(powf(x_error, 2) + powf(y_error, 2));
-    g_diff_drive_state.err_ori = g_current_point.theta - c_pose->theta;
+    g_diff_drive_error.err_dist = sqrtf(powf(x_error, 2) + powf(y_error, 2));
+    g_diff_drive_error.err_ori = g_current_point.theta - c_pose->theta;
 
-    float dist_error = g_diff_drive_state.err_dist;
-    float ori_e = g_diff_drive_state.err_ori;
+    float dist_error = g_diff_drive_error.err_dist;
+    float ori_e = g_diff_drive_error.err_ori;
 
     // printf("theta_error:%f,d_error:%f,ori_e:%f*/\r\n", theta_error, dist_error, ori_e);
 
     if (dist_error > DISTANCE_TH)
     {
-        g_diff_drive_state.state = DD_STATE_NAVIGATING;
+        g_diff_drive_state = DD_STATE_NAVIGATING;
         ESP_ERROR_CHECK(diff_drive_position_control(theta_error));
     }
     else if (fabs(ori_e) >= ORIENTATION_TH)
@@ -150,14 +155,13 @@ esp_err_t diff_drive_point_follower(kalman_info_t *c_pose)
     else
     {
         ESP_LOGI(TAG, "Vehicle reached point: (%f, %f, theta:%f)\n", g_current_point.x, g_current_point.y, g_current_point.theta);
-        ESP_ERROR_CHECK(diff_drive_send2traction((tract_ctrl_cmd_t){
-            .cmd = TRACT_CTRL_CMD_STOP,
-            .motor_left_speed = NULL,
-            .motor_right_speed = NULL,
-        }));
-        g_diff_drive_state.state = DD_STATE_POINT_REACHED;
+        //ESP_ERROR_CHECK(diff_drive_send2traction((tract_ctrl_cmd_t){
+        //    .cmd = TRACT_CTRL_CMD_STOP,
+        //    .motor_left_speed = NULL,
+        //    .motor_right_speed = NULL,
+        //}));
 
-        ESP_ERROR_CHECK(diff_drive_send2queue(g_diff_drive_state));
+        diff_drive_update_state(DD_STATE_POINT_REACHED);
     }
 
     return ESP_OK;
@@ -165,27 +169,26 @@ esp_err_t diff_drive_point_follower(kalman_info_t *c_pose)
 
 esp_err_t diff_drive_set_navigation_point(navigation_point_t point)
 {
-    ESP_RETURN_ON_FALSE(g_diff_drive_state.state == DD_STATE_POINT_REACHED, ESP_ERR_INVALID_STATE, TAG, "Trying to change nav point before trajectory is compleated");
+    //printf("STATE: %d\n", g_diff_drive_state);
+    ESP_RETURN_ON_FALSE(g_diff_drive_state == DD_STATE_POINT_REACHED || g_diff_drive_state == DD_STATE_STARTED, ESP_ERR_INVALID_STATE, TAG, "Trying to change nav point before trajectory is compleated");
 
     ESP_LOGI(TAG, "New desired pose: (%.4f, %.4f, %.2f)\r\n", point.x, point.y, point.theta);
 
     g_current_point = point;
 
-    if (g_diff_drive_state.state != DD_STATE_ORIENTING)
+    if (g_diff_drive_state != DD_STATE_ORIENTING)
     {
-        g_diff_drive_state.state = DD_STATE_ORIENTING;
+        diff_drive_update_state(DD_STATE_ORIENTING);
     }
-
-    ESP_ERROR_CHECK(diff_drive_send2queue(g_diff_drive_state));
 
     return ESP_OK;
 }
 
-esp_err_t diff_drive_get_data_queue_handle(QueueHandle_t *queue)
+esp_err_t diff_drive_get_state_queue_handle(QueueHandle_t *queue)
 {
-    ESP_RETURN_ON_FALSE(g_diff_drive_data_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "Data queue handle is NULL");
+    ESP_RETURN_ON_FALSE(g_diff_drive_state_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "Data queue handle is NULL");
 
-    *queue = g_diff_drive_data_queue;
+    *queue = g_diff_drive_state_queue;
 
     return ESP_OK;
 }
@@ -231,7 +234,7 @@ void diff_drive_receive_kalman_data(void)
 #if false 
             printf("/*x,%f,xd,%f,y,%f,yd,%f,theta,%f,thetad,%f,state,%d*/\r\n", vehicle_pose.x, g_current_point.x, vehicle_pose.y, g_current_point.y, vehicle_pose.theta, g_current_point.theta, g_diff_drive_state);
 #endif
-        if (g_diff_drive_state.state != DD_STATE_POINT_REACHED)
+        if (g_diff_drive_state != DD_STATE_POINT_REACHED)
             ESP_ERROR_CHECK(diff_drive_point_follower(&vehicle_pose));
     }
 }
@@ -239,13 +242,13 @@ void diff_drive_receive_kalman_data(void)
 /* Event handlers */
 esp_err_t diff_drive_start_event_handle(void)
 {
-    if (g_diff_drive_state.state == DD_STATE_STARTED)
+    if (g_diff_drive_state == DD_STATE_STARTED)
     {
         ESP_LOGW(TAG, "Process already started!");
         return ESP_OK;
     }
 
-    diff_drive_set_state(DD_STATE_STARTED);
+    diff_drive_update_state(DD_STATE_STARTED);
     ESP_ERROR_CHECK(diff_drive_send2traction((tract_ctrl_cmd_t){
         .cmd = TRACT_CTRL_CMD_START,
         .motor_left_speed = NULL,
@@ -258,13 +261,18 @@ esp_err_t diff_drive_start_event_handle(void)
 
 esp_err_t diff_drive_stop_event_handle(void)
 {
-    if (g_diff_drive_state.state == DD_STATE_STOPPED)
+    if (g_diff_drive_state == DD_STATE_STOPPED)
     {
         ESP_LOGW(TAG, "Process already stopped!");
         return ESP_OK;
     }
 
-    diff_drive_set_state(DD_STATE_STOPPED);
+    diff_drive_update_state(DD_STATE_STOPPED);
+    ESP_ERROR_CHECK(diff_drive_send2traction((tract_ctrl_cmd_t){
+        .cmd = TRACT_CTRL_CMD_STOP,
+        .motor_left_speed = NULL,
+        .motor_right_speed = NULL,
+    }));
     ESP_LOGW(TAG, "Process Stopped");
 
     return ESP_OK;
@@ -292,18 +300,22 @@ void diff_drive_cmd_handler(void)
         switch (cmd.cmd)
         {
         case DD_CMD_STOP:
+            ESP_LOGI(TAG, "Event: Stop Process");
             diff_drive_stop_event_handle();
             break;
 
         case DD_CMD_START:
+            ESP_LOGI(TAG, "Event: Start Process");
             diff_drive_start_event_handle();
             break;
 
         case DD_CMD_RECEIVE_POINT:
+            ESP_LOGI(TAG, "Event: Point received");
             diff_drive_receive_point_event_handler(cmd.point);
             break;
 
         default:
+            ESP_LOGE(TAG, "Wrong CMD format");
             break;
         }
     }
@@ -363,7 +375,7 @@ static void diff_drive_ctrl_task(void *pvParameters)
     diff_drive_handle = (diff_drive_ctrl_handle_t *)malloc(sizeof(diff_drive_ctrl_handle_t));
 
     /* Initialize queues */
-    g_diff_drive_data_queue = xQueueCreate(4, sizeof(diff_drive_state_t));
+    g_diff_drive_state_queue = xQueueCreate(4, sizeof(diff_drive_state_e));
     g_diff_drive_cmd_queue = xQueueCreate(4, sizeof(diff_drive_cmd_t));
 
     ESP_ERROR_CHECK(diff_drive_ctrl_init());
@@ -375,7 +387,7 @@ static void diff_drive_ctrl_task(void *pvParameters)
     };
 
     /* Get queue reference */
-    while (kalman_fiter_get_data_queue(&g_kalman_data_queue) != ESP_OK)
+    while (kalman_get_data_queue(&g_kalman_data_queue) != ESP_OK)
     {
         ESP_LOGE(TAG, "Failed to get kalman data queue. Retraying...");
         vTaskDelay(pdMS_TO_TICKS(20));
@@ -387,20 +399,21 @@ static void diff_drive_ctrl_task(void *pvParameters)
         vTaskDelay(pdMS_TO_TICKS(20));
     }
 
-    g_diff_drive_state = (diff_drive_state_t){
+    g_diff_drive_error = (diff_drive_err_t){
         .err_dist = 0.0f,
         .err_ori = 0.0f,
         .err_theta = 0.0f,
         .err_x = 0.0f,
         .err_y = 0.0f,
-        .state = DD_STATE_READY,
     };
 
-    ESP_ERROR_CHECK(diff_drive_send2queue(g_diff_drive_state));
+    // ESP_ERROR_CHECK(diff_drive_update_state());
+    diff_drive_update_state(DD_STATE_READY);
 
     for (;;)
     {
-        if (g_diff_drive_state.state != DD_STATE_STOPPED && g_diff_drive_state.state != DD_STATE_POINT_REACHED)
+        /* TODO: THere is a problem in this condition */
+        if (g_diff_drive_state == DD_STATE_ORIENTING || g_diff_drive_state == DD_STATE_NAVIGATING)
         {
             diff_drive_receive_kalman_data();
         }

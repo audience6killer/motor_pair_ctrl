@@ -50,6 +50,8 @@ static void traction_pid_loop_cb(void *args)
     static int motor_right_last_pulse_count = 0;
     static motor_pair_state_e last_traction_state = STOPPED;
 
+    // ESP_LOGI(TAG, "In loooooooop");
+
     // Calculate current speed
     int motor_left_cur_pulse_count = 0;
     int motor_right_cur_pulse_count = 0;
@@ -160,10 +162,7 @@ static void traction_pid_loop_cb(void *args)
         traction_data.mright_set_point = g_traction_handle->motor_right_ctx.desired_speed;
 
     // Send data to the queue
-    if (tract_ctrl_send2data_queue(&traction_data) != ESP_OK)
-    {
-        ESP_LOGE(TAG, "Error sending data to queue");
-    }
+    tract_ctrl_send2data_queue(&traction_data);
 
     // if (xQueueSend(g_traction_data_queue, &traction_data, portMAX_DELAY) != pdPASS)
     //{
@@ -178,7 +177,7 @@ esp_err_t tract_ctrl_send2data_queue(motor_pair_data_t *data)
 
     if (xQueueSend(g_traction_data_queue, data, pdMS_TO_TICKS(20)) != pdPASS)
     {
-        ESP_LOGE(TAG, "Error sending data to queue");
+        //ESP_LOGE(TAG, "Error sending data to queue");
         return ESP_FAIL;
     }
 
@@ -225,8 +224,7 @@ esp_err_t tract_ctrl_start_event_handler(void)
         return ESP_OK;
     }
 
-    ESP_LOGI(TAG, "Starting motor speed loop");
-    ESP_ERROR_CHECK(esp_timer_start_periodic(g_traction_pid_timer, BDC_PID_LOOP_PERIOD_MS * 1000));
+
 
     return ESP_OK;
 }
@@ -354,14 +352,15 @@ static void tract_ctrl_task(void *pvParameters)
         },
     };
 
-    // Init motor pair unit
+    /* Init motor pair unit */
     ESP_ERROR_CHECK(motor_pair_init(&tract_ctrl_config, g_traction_handle));
 
-    // Setting up timer
+    /* Setting up timer */
     const esp_timer_create_args_t traction_timer_args = {
-        .callback = traction_pid_loop_cb,
+        .callback = &traction_pid_loop_cb,
         .arg = NULL,
         .name = "traction_pid_loop",
+        .dispatch_method = ESP_TIMER_TASK,
     };
 
     ESP_ERROR_CHECK(esp_timer_create(&traction_timer_args, &g_traction_pid_timer));
@@ -385,6 +384,14 @@ static void tract_ctrl_task(void *pvParameters)
     // Setting up queue
     g_traction_data_queue = xQueueCreate(4, sizeof(motor_pair_data_t));
     g_traction_cmd_queue = xQueueCreate(4, sizeof(tract_ctrl_cmd_t));
+
+    ESP_LOGI(TAG, "Starting motor speed loop");
+    esp_err_t ret = esp_timer_start_periodic(g_traction_pid_timer, BDC_PID_LOOP_PERIOD_MS * 1000);
+
+    if(ret != ESP_OK)
+        ESP_LOGE(TAG, "Error starting pid loop timer");
+    else
+        ESP_LOGI(TAG, "PID loop timer started correctly");
 
     for (;;)
     {

@@ -16,7 +16,7 @@ extern "C"
 
 static const char TAG[] = "state_machine";
 static QueueHandle_t g_state_machine_queue_handle = NULL;
-static waypoint_ctrl_state_e g_waypoint_state = WP_STOPPED;
+static waypoint_state_e g_waypoint_state = WP_STOPPED;
 
 esp_err_t state_machine_send2queue(state_machine_msg_t *cmd)
 {

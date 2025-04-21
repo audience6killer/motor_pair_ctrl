@@ -41,5 +41,7 @@
         "cstring": "cpp"
     },
     "idf.flashType": "UART",
-    "idf.pythonInstallPath": "/usr/bin/python3"
+    "idf.pythonInstallPath": "/usr/bin/python3",
+    "workbench.editor.revealIfOpen": true,
+    "workbench.editor.enablePreview": true,
 }

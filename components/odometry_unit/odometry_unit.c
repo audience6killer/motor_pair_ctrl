@@ -17,8 +17,9 @@
 
 static const char TAG[] = "odometry_task";
 
-static QueueHandle_t g_odometry_data_queue;
-static QueueHandle_t g_odometry_cmd_queue;
+static QueueHandle_t g_odometry_data_queue = NULL;
+static QueueHandle_t g_odometry_cmd_queue = NULL;
+static QueueHandle_t g_traction_data_queue = NULL;
 static odometry_data_t g_vehicle_pose;
 static esp_timer_handle_t g_odometry_timer_handle = NULL;
 
@@ -34,9 +35,9 @@ esp_err_t odometry_get_data_queue(QueueHandle_t *queue)
 {
     ESP_RETURN_ON_FALSE(g_odometry_data_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue handle is NULL");
 
-    if(g_odometry_data_queue == NULL)
+    if (g_odometry_data_queue == NULL)
     {
-        //ESP_LOGE(TAG, "Data queue is NULL while retraiving");
+        // ESP_LOGE(TAG, "Data queue is NULL while retraiving");
 
         return ESP_FAIL;
     }
@@ -144,11 +145,23 @@ esp_err_t odometry_set_current_state(odometry_state_e state)
     return ESP_OK;
 }
 
-esp_err_t odometry_stop(void)
+void odometry_get_traction_data(void)
+{
+    static motor_pair_data_t traction_data;
+    // initialize_odometry_data(&g_vehicle_pose);
+
+    if (xQueueReceive(g_traction_data_queue, &traction_data, pdMS_TO_TICKS(10)))
+    {
+        odometry_calculate_pose(traction_data);
+    }
+}
+
+/* Event handlers */
+esp_err_t odometry_stop_event_handler(void)
 {
     ESP_RETURN_ON_FALSE(g_odometry_timer_handle != NULL, ESP_ERR_INVALID_STATE, TAG, "Timer handle is NULL");
 
-    if(!esp_timer_is_active(g_odometry_timer_handle))
+    if (!esp_timer_is_active(g_odometry_timer_handle))
     {
         ESP_LOGW(TAG, "Odometry timer already stopped");
         return ESP_OK;
@@ -160,11 +173,11 @@ esp_err_t odometry_stop(void)
     return ESP_OK;
 }
 
-esp_err_t odometry_start(void)
+esp_err_t odometry_start_event_handler(void)
 {
     ESP_RETURN_ON_FALSE(g_odometry_timer_handle != NULL, ESP_ERR_INVALID_STATE, TAG, "Timer handle is NULL");
 
-    if(esp_timer_is_active(g_odometry_timer_handle))
+    if (esp_timer_is_active(g_odometry_timer_handle))
     {
         ESP_LOGW(TAG, "Odometry timer already started");
         return ESP_OK;
@@ -177,19 +190,39 @@ esp_err_t odometry_start(void)
     return ESP_OK;
 }
 
-static void odometry_unit_task(void *pvParameters)
+void odometry_event_handler(void)
+{
+    static odometry_cmd_e cmd;
+
+    if (xQueueReceive(g_odometry_cmd_queue, &cmd, pdMS_TO_TICKS(100)) == pdPASS)
+    {
+        switch (cmd)
+        {
+        case ODO_CMD_START:
+            if (odometry_start_event_handler() != ESP_OK)
+                ESP_LOGE(TAG, "Error starting odometry loop");
+            break;
+        case ODO_CMD_STOP:
+            if (odometry_stop_event_handler() != ESP_OK)
+                ESP_LOGE(TAG, "Error stopping odometry loop");
+            break;
+        default:
+            break;
+        }
+    }
+}
+
+/* Odometry task */
+static void odometry_task(void *pvParameters)
 {
     ESP_LOGI(TAG, "Initializing odometry task");
 
     // Setting up traction queue and variable to save msg
-    QueueHandle_t traction_control_queue = NULL;
-    while (tract_ctrl_get_data_queue(&traction_control_queue) != ESP_OK)
+    while (tract_ctrl_get_data_queue(&g_traction_data_queue) != ESP_OK)
     {
         ESP_LOGE(TAG, "Error getting traction control queue. Retrying...");
         vTaskDelay(pdMS_TO_TICKS(100));
     }
-    motor_pair_data_t traction_data;
-    initialize_odometry_data(&g_vehicle_pose);
 
     // Setting up timer for odometry
     esp_timer_create_args_t odometry_timer_args = {
@@ -203,29 +236,15 @@ static void odometry_unit_task(void *pvParameters)
     g_odometry_cmd_queue = xQueueCreate(4, sizeof(odometry_cmd_e));
     g_odometry_data_queue = xQueueCreate(4, sizeof(odometry_data_t));
 
-    odometry_cmd_e cmd;
-
     odometry_set_current_state(ODO_STOPPED);
 
     for (;;)
     {
-        if (xQueueReceive(g_odometry_data_queue, &cmd, pdMS_TO_TICKS(100)) == pdPASS)
+        if(g_vehicle_pose.odometry_state == ODO_RUNNING)
         {
-            switch (cmd)
-            {
-            case ODO_CMD_START:
-                if(odometry_start() != ESP_OK)
-                    ESP_LOGE(TAG, "Error starting odometry loop");
-                break;
-            case ODO_CMD_STOP:
-                if(odometry_stop() != ESP_OK)
-                    ESP_LOGE(TAG, "Error stopping odometry loop");
-                break;
-            default:
-                break;
-            }
+            odometry_get_traction_data();
         }
-
+        odometry_event_handler();
         vTaskDelay(pdMS_TO_TICKS(1));
     }
 }
@@ -234,5 +253,5 @@ void odometry_start_task(void)
 {
     ESP_LOGI(TAG, "Iniatilazing task");
 
-    xTaskCreatePinnedToCore(&odometry_unit_task, "odometry_task", ODOMETRY_TASK_STACK_SIZE, NULL, ODOMETRY_TASK_PRIORITY, NULL, ODOMETRY_TASK_CORE_ID);
+    xTaskCreatePinnedToCore(&odometry_task, "odometry_task", ODOMETRY_TASK_STACK_SIZE, NULL, ODOMETRY_TASK_PRIORITY, NULL, ODOMETRY_TASK_CORE_ID);
 }

@@ -4,14 +4,6 @@
 #include "pid_ctrl.h"
 #include "kalman_filter.h"
 
-typedef struct
-{
-    pid_ctrl_block_handle_t position_pid_ctrl;
-    pid_ctrl_block_handle_t orientation_pid_ctrl;
-    float vel_l;                // rad/s -> rev/s
-    float vel_r;
-} diff_drive_ctrl_handle_t;
-
 typedef enum {
     DD_STATE_STOPPED = 0,
     DD_STATE_READY,
@@ -27,9 +19,7 @@ typedef struct {
     float err_theta;
     float err_dist;
     float err_ori;
-    
-    diff_drive_state_e state;
-} diff_drive_state_t;
+} diff_drive_err_t;
 
 typedef enum {
     DD_CMD_STOP = 0,
@@ -42,8 +32,6 @@ typedef struct
     float x;
     float y;
     float theta;
-
-    //diff_drive_state_t state;
 } navigation_point_t;
 
 typedef struct {
@@ -54,7 +42,7 @@ typedef struct {
 
 esp_err_t diff_drive_get_cmd_queue_handle(QueueHandle_t *queue);
 
-esp_err_t diff_drive_get_data_queue_handle(QueueHandle_t *queue);
+esp_err_t diff_drive_get_state_queue_handle(QueueHandle_t *queue);
 
 void diff_drive_ctrl_task_start(void);
 

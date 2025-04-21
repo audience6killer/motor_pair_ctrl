@@ -31,7 +31,14 @@ extern "C"
         navigation_point_t *point;
     } waypoint_cmd_t;
 
-    esp_err_t waypoint_get_data_queue_handle(QueueHandle_t *handle);
+    static inline const char* waypoint_state_to_string(waypoint_state_e state)
+    {
+        static const char* states[] = {"WP_STOPPED", "WP_INIT", "WP_READY", "WP_NAVIGATING", "WP_WAITING", "WP_TRJ_FINISHED"};
+
+        return states[state];
+    }
+
+    esp_err_t waypoint_get_state_queue_handle(QueueHandle_t *handle);
 
     esp_err_t waypoint_get_cmd_queue_handle(QueueHandle_t *handle);
 
