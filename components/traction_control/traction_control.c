@@ -44,6 +44,22 @@ esp_err_t tract_ctrl_set_speed_event_handler(float *mleft_speed_pv, float *mrigh
  */
 esp_err_t tract_ctrl_send2data_queue(motor_pair_data_t *data);
 
+esp_err_t tract_ctrl_get_data_queue(QueueHandle_t *queue)
+{
+    ESP_RETURN_ON_FALSE(g_traction_data_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue handle is NULL");
+
+    *queue = g_traction_data_queue;
+    return ESP_OK;
+}
+
+esp_err_t tract_ctrl_get_cmd_queue(QueueHandle_t *queue)
+{
+    ESP_RETURN_ON_FALSE(g_traction_cmd_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue handle is NULL");
+
+    *queue = g_traction_cmd_queue;
+    return ESP_OK;
+}
+
 static void traction_pid_loop_cb(void *args)
 {
     static int motor_left_last_pulse_count = 0;
@@ -279,17 +295,17 @@ void tract_ctrl_event_loop(void)
         switch (tract_ctrl_cmd.cmd)
         {
         case TRACT_CTRL_CMD_STOP:
-            ESP_LOGI(TAG, "Stop command received");
+            ESP_LOGI(TAG, "Event: Stop Event");
             if (tract_ctrl_stop_event_handler() != ESP_OK)
             {
-                ESP_LOGE(TAG, "Error stopping PID loop");
+                ESP_LOGE(TAG, "Event Error: Error stopping the process");
             }
             break;
         case TRACT_CTRL_CMD_START:
-            ESP_LOGI(TAG, "Start command received");
+            ESP_LOGI(TAG, "Event: Start Event");
             if (tract_ctrl_start_event_handler() != ESP_OK)
             {
-                ESP_LOGE(TAG, "Error starting PID loop");
+                ESP_LOGE(TAG, "Event Error: Error starting the process");
             }
             break;
         case TRACT_CTRL_CMD_SET_SPEED:
@@ -297,7 +313,7 @@ void tract_ctrl_event_loop(void)
             esp_err_t ret = tract_ctrl_set_speed_event_handler(tract_ctrl_cmd.motor_left_speed, tract_ctrl_cmd.motor_right_speed);
             if (ret != ESP_OK)
             {
-                ESP_LOGE(TAG, "Error setting speed controlled direction");
+                ESP_LOGE(TAG, "Event Error: Error setting up the speed controlled direction");
             }
             break;
         default:
@@ -378,8 +394,8 @@ static void tract_ctrl_task(void *pvParameters)
     };
 
     // Set initial speed
-    float initial_speed = 0.0f;
-    tract_ctrl_set_speed_event_handler(&initial_speed, &initial_speed);
+    // float initial_speed = 0.0f;
+    // tract_ctrl_set_speed_event_handler(&initial_speed, &initial_speed);
 
     // Setting up queue
     g_traction_data_queue = xQueueCreate(4, sizeof(motor_pair_data_t));
@@ -399,22 +415,6 @@ static void tract_ctrl_task(void *pvParameters)
         tract_ctrl_event_loop();
         vTaskDelay(pdMS_TO_TICKS(10));
     }
-}
-
-esp_err_t tract_ctrl_get_data_queue(QueueHandle_t *queue)
-{
-    ESP_RETURN_ON_FALSE(g_traction_data_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue handle is NULL");
-
-    *queue = g_traction_data_queue;
-    return ESP_OK;
-}
-
-esp_err_t tract_ctrl_get_cmd_queue(QueueHandle_t *queue)
-{
-    ESP_RETURN_ON_FALSE(g_traction_cmd_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue handle is NULL");
-
-    *queue = g_traction_cmd_queue;
-    return ESP_OK;
 }
 
 void tract_ctrl_start_task(void)

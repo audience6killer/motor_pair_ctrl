@@ -81,10 +81,9 @@ esp_err_t motor_pair_set_speed(int motor_left_speed, int motor_right_speed, moto
 
 esp_err_t motor_pair_enable_motors(motor_pair_handle_t *pvHandle)
 {
-
-    ESP_LOGI(TAG, "Starting encoder unit: %s", pvHandle->motor_left_ctx.motor_id);
+    // ESP_LOGI(TAG, "Starting encoder unit: %s", pvHandle->motor_left_ctx.motor_id);
     ESP_ERROR_CHECK(pcnt_unit_enable(pvHandle->motor_left_ctx.pcnt_encoder));
-    ESP_LOGI(TAG, "Starting encoder unit: %s", pvHandle->motor_right_ctx.motor_id);
+    // ESP_LOGI(TAG, "Starting encoder unit: %s", pvHandle->motor_right_ctx.motor_id);
     ESP_ERROR_CHECK(pcnt_unit_enable(pvHandle->motor_right_ctx.pcnt_encoder));
 
     ESP_ERROR_CHECK(pcnt_unit_clear_count(pvHandle->motor_left_ctx.pcnt_encoder));
@@ -93,9 +92,9 @@ esp_err_t motor_pair_enable_motors(motor_pair_handle_t *pvHandle)
     ESP_ERROR_CHECK(pcnt_unit_start(pvHandle->motor_left_ctx.pcnt_encoder));
     ESP_ERROR_CHECK(pcnt_unit_start(pvHandle->motor_right_ctx.pcnt_encoder));
 
-    ESP_LOGI(TAG, "Enabling motor: %s", pvHandle->motor_left_ctx.motor_id);
+    // ESP_LOGI(TAG, "Enabling motor: %s", pvHandle->motor_left_ctx.motor_id);
     ESP_ERROR_CHECK(bdc_motor_enable(pvHandle->motor_left_ctx.motor));
-    ESP_LOGI(TAG, "Enabling motor: %s", pvHandle->motor_right_ctx.motor_id);
+    // ESP_LOGI(TAG, "Enabling motor: %s", pvHandle->motor_right_ctx.motor_id);
     ESP_ERROR_CHECK(bdc_motor_enable(pvHandle->motor_right_ctx.motor));
 
     ESP_ERROR_CHECK(bdc_motor_brake(pvHandle->motor_left_ctx.motor));
@@ -168,7 +167,7 @@ esp_err_t motor_pair_init_individual_motor(motor_config_t *motor_config, motor_p
     pvMotor->pcnt_encoder = motor_pcnt_unit;
 
     /* PID control init*/
-    ESP_LOGI(TAG, "Create PID control block");
+    //ESP_LOGI(TAG, "Create PID control block");
     pid_ctrl_parameter_t motor_pid_runtime_param = {
         .kp = motor_config->pid_config.kp,
         .ki = motor_config->pid_config.ki,
@@ -189,6 +188,7 @@ esp_err_t motor_pair_init_individual_motor(motor_config_t *motor_config, motor_p
 
     pvMotor->pid_ctrl = motor_pid_ctrl;
 
+    ESP_LOGI(TAG, "Finished initializing motor: %s", pvMotor->motor_id);
 
     return ESP_OK;
 }
