@@ -71,7 +71,7 @@ void start_test_waypoint_follower(void)
         ESP_LOGI(TAG, "Sended second point");
     }
 
-    if(xQueueSend(g_waypoint_cmd_handle, &cmd_1, pdMS_TO_TICKS(100)) == pdPASS)
+    if(xQueueSend(g_waypoint_cmd_handle, &cmd_2, pdMS_TO_TICKS(100)) == pdPASS)
     {
         ESP_LOGI(TAG, "Sended third point");
     }

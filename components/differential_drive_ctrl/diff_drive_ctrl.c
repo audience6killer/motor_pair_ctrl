@@ -155,11 +155,12 @@ esp_err_t diff_drive_point_follower(kalman_info_t *c_pose)
     else
     {
         ESP_LOGI(TAG, "Vehicle reached point: (%f, %f, theta:%f)\n", g_current_point.x, g_current_point.y, g_current_point.theta);
-        //ESP_ERROR_CHECK(diff_drive_send2traction((tract_ctrl_cmd_t){
-        //    .cmd = TRACT_CTRL_CMD_STOP,
-        //    .motor_left_speed = NULL,
-        //    .motor_right_speed = NULL,
-        //}));
+        float speed = 0.0f;
+        ESP_ERROR_CHECK(diff_drive_send2traction((tract_ctrl_cmd_t){
+            .cmd = TRACT_CTRL_CMD_SET_SPEED,
+            .motor_left_speed = &speed,
+            .motor_right_speed = &speed,
+        }));
 
         diff_drive_update_state(DD_STATE_POINT_REACHED);
     }
@@ -230,6 +231,7 @@ void diff_drive_receive_kalman_data(void)
 
     if (xQueueReceive(g_kalman_data_queue, &vehicle_pose, pdMS_TO_TICKS(20)) == pdPASS)
     {
+            //printf("kalman received in diff_drive\n");
 
 #if false 
             printf("/*x,%f,xd,%f,y,%f,yd,%f,theta,%f,thetad,%f,state,%d*/\r\n", vehicle_pose.x, g_current_point.x, vehicle_pose.y, g_current_point.y, vehicle_pose.theta, g_current_point.theta, g_diff_drive_state);

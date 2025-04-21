@@ -50,7 +50,7 @@ static void traction_pid_loop_cb(void *args)
     static int motor_right_last_pulse_count = 0;
     static motor_pair_state_e last_traction_state = STOPPED;
 
-    // ESP_LOGI(TAG, "In loooooooop");
+    //ESP_LOGI(TAG, "In loooooooop");
 
     // Calculate current speed
     int motor_left_cur_pulse_count = 0;

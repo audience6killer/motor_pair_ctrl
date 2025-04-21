@@ -63,7 +63,6 @@ esp_err_t waypoint_add_point(float x, float y, float theta)
 /* ISR Routine */
 void waypoint_trajectory_ctrl(void *args)
 {
-    // ESP_LOGE(TAG, "timer finished!!!!!!!");
     if (g_waypoint_state == WP_WAITING)
     {
         if (g_navigation_points.size() > 0)
@@ -77,19 +76,14 @@ void waypoint_trajectory_ctrl(void *args)
             };
 
             xQueueSendFromISR(g_diff_drive_cmd_queue, &point_cmd, NULL);
-            // diff_drive_set_navigation_point(point);
 
-            //ESP_ERROR_CHECK(waypoint_send2queue(WP_NAVIGATING));
             g_waypoint_state = WP_NAVIGATING;
             waypoint_state_e state = g_waypoint_state;
             xQueueSendFromISR(g_waypoint_state_queue, &state, NULL);
-            // ESP_LOGI(TAG, "Next point in trajectory sended: (%.4f, %.4f, %.4f)", point.x, point.y, point.theta);
         }
 
         else
         {
-            // ESP_LOGI(TAG, "Trajectory finished!");
-            //ESP_ERROR_CHECK(waypoint_send2queue(WP_TRJ_FINISHED));
             g_waypoint_state = WP_TRJ_FINISHED;
             waypoint_state_e state = g_waypoint_state;
             xQueueSendFromISR(g_waypoint_state_queue, &state, NULL);
