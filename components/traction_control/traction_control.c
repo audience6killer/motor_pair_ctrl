@@ -44,6 +44,11 @@ esp_err_t tract_ctrl_set_speed_event_handler(float *mleft_speed_pv, float *mrigh
  */
 esp_err_t tract_ctrl_send2data_queue(motor_pair_data_t *data);
 
+motor_pair_state_e tract_ctrl_get_current_state(void)
+{
+    return g_traction_state;
+}
+
 esp_err_t tract_ctrl_get_data_queue(QueueHandle_t *queue)
 {
     ESP_RETURN_ON_FALSE(g_traction_data_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue handle is NULL");
@@ -65,8 +70,6 @@ static void traction_pid_loop_cb(void *args)
     static int motor_left_last_pulse_count = 0;
     static int motor_right_last_pulse_count = 0;
     static motor_pair_state_e last_traction_state = STOPPED;
-
-    //ESP_LOGI(TAG, "In loooooooop");
 
     // Calculate current speed
     int motor_left_cur_pulse_count = 0;
@@ -100,50 +103,50 @@ static void traction_pid_loop_cb(void *args)
         case BRAKE:
             ESP_ERROR_CHECK(bdc_motor_brake(g_traction_handle->motor_left_ctx.motor));
             ESP_ERROR_CHECK(bdc_motor_brake(g_traction_handle->motor_right_ctx.motor));
-            ESP_LOGI(TAG, "tract_ctrl_STATE: BREAK");
+            ESP_LOGI(TAG, "TRACT_DIR: BREAK");
             break;
         case COAST:
             ESP_ERROR_CHECK(bdc_motor_coast(g_traction_handle->motor_left_ctx.motor));
             ESP_ERROR_CHECK(bdc_motor_coast(g_traction_handle->motor_right_ctx.motor));
-            ESP_LOGI(TAG, "tract_ctrl_STATE: COAST");
+            ESP_LOGI(TAG, "TRACT_DIR: COAST");
             break;
         case STARTING:
             ESP_ERROR_CHECK(bdc_motor_forward(g_traction_handle->motor_left_ctx.motor));
             ESP_ERROR_CHECK(bdc_motor_forward(g_traction_handle->motor_right_ctx.motor));
-            ESP_LOGI(TAG, "tract_ctrl_STATE: STARTING");
+            ESP_LOGI(TAG, "TRACT_DIR: STARTING");
             break;
         case FORWARD:
             ESP_ERROR_CHECK(bdc_motor_forward(g_traction_handle->motor_left_ctx.motor));
             ESP_ERROR_CHECK(bdc_motor_forward(g_traction_handle->motor_right_ctx.motor));
-            ESP_LOGI(TAG, "tract_ctrl_STATE: FORWARD");
+            ESP_LOGI(TAG, "TRACT_DIR: FORWARD");
             break;
         case REVERSE:
             ESP_ERROR_CHECK(bdc_motor_reverse(g_traction_handle->motor_left_ctx.motor));
             ESP_ERROR_CHECK(bdc_motor_reverse(g_traction_handle->motor_right_ctx.motor));
-            ESP_LOGI(TAG, "tract_ctrl_STATE: REVERSE");
+            ESP_LOGI(TAG, "TRACT_DIR: REVERSE");
             break;
         case TURN_LEFT_FORWARD:
             ESP_ERROR_CHECK(bdc_motor_reverse(g_traction_handle->motor_left_ctx.motor));
             ESP_ERROR_CHECK(bdc_motor_forward(g_traction_handle->motor_right_ctx.motor));
-            ESP_LOGI(TAG, "tract_ctrl_STATE: LEFT FORWARD");
+            ESP_LOGI(TAG, "TRACT_DIR: LEFT FORWARD");
             break;
         case TURN_RIGHT_FORWARD:
             ESP_ERROR_CHECK(bdc_motor_forward(g_traction_handle->motor_left_ctx.motor));
             ESP_ERROR_CHECK(bdc_motor_reverse(g_traction_handle->motor_right_ctx.motor));
-            ESP_LOGI(TAG, "tract_ctrl_STATE: RIGHT FORWARD");
+            ESP_LOGI(TAG, "TRACT_DIR: RIGHT FORWARD");
             break;
         case TURN_LEFT_REVERSE:
             ESP_ERROR_CHECK(bdc_motor_forward(g_traction_handle->motor_left_ctx.motor));
             ESP_ERROR_CHECK(bdc_motor_reverse(g_traction_handle->motor_right_ctx.motor));
-            ESP_LOGI(TAG, "tract_ctrl_STATE: LEFT REVERSE");
+            ESP_LOGI(TAG, "TRACT_DIR: LEFT REVERSE");
             break;
         case TURN_RIGHT_REVERSE:
             ESP_ERROR_CHECK(bdc_motor_reverse(g_traction_handle->motor_left_ctx.motor));
             ESP_ERROR_CHECK(bdc_motor_forward(g_traction_handle->motor_right_ctx.motor));
-            ESP_LOGI(TAG, "tract_ctrl_STATE: RIGHT REVERSE");
+            ESP_LOGI(TAG, "TRACT_DIR: RIGHT REVERSE");
             break;
         default:
-            ESP_LOGI(TAG, "tract_ctrl_STATE: ERRORRRRRRRRR");
+            ESP_LOGI(TAG, "TRACT_DIR: ERRORRRRRRRRR");
             break;
         }
     }
@@ -193,7 +196,7 @@ esp_err_t tract_ctrl_send2data_queue(motor_pair_data_t *data)
 
     if (xQueueSend(g_traction_data_queue, data, pdMS_TO_TICKS(20)) != pdPASS)
     {
-        //ESP_LOGE(TAG, "Error sending data to queue");
+        // ESP_LOGE(TAG, "Error sending data to queue");
         return ESP_FAIL;
     }
 
@@ -225,8 +228,12 @@ esp_err_t tract_ctrl_stop_event_handler(void)
     pid_reset_ctrl_block(g_traction_handle->motor_left_ctx.pid_ctrl);
     pid_reset_ctrl_block(g_traction_handle->motor_right_ctx.pid_ctrl);
 
-    ESP_LOGI(TAG, "Stopping motor speed loop");
-    ESP_ERROR_CHECK(esp_timer_stop(g_traction_pid_timer));
+    esp_err_t ret = esp_timer_stop(g_traction_pid_timer);
+    if (ret != ESP_OK)
+        ESP_LOGE(TAG, "Error stopping speed loop");
+    else
+        ESP_LOGI(TAG, "Speed loop stopped successfully");
+
     return ESP_OK;
 }
 
@@ -239,8 +246,6 @@ esp_err_t tract_ctrl_start_event_handler(void)
         ESP_LOGW(TAG, "PID loop already started");
         return ESP_OK;
     }
-
-
 
     return ESP_OK;
 }
@@ -404,7 +409,7 @@ static void tract_ctrl_task(void *pvParameters)
     ESP_LOGI(TAG, "Starting motor speed loop");
     esp_err_t ret = esp_timer_start_periodic(g_traction_pid_timer, BDC_PID_LOOP_PERIOD_MS * 1000);
 
-    if(ret != ESP_OK)
+    if (ret != ESP_OK)
         ESP_LOGE(TAG, "Error starting pid loop timer");
     else
         ESP_LOGI(TAG, "PID loop timer started correctly");

@@ -35,13 +35,6 @@ esp_err_t odometry_get_data_queue(QueueHandle_t *queue)
 {
     ESP_RETURN_ON_FALSE(g_odometry_data_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue handle is NULL");
 
-    if (g_odometry_data_queue == NULL)
-    {
-        // ESP_LOGE(TAG, "Data queue is NULL while retraiving");
-
-        return ESP_FAIL;
-    }
-
     *queue = g_odometry_data_queue;
     return ESP_OK;
 }
@@ -71,7 +64,7 @@ esp_err_t initialize_odometry_data(odometry_data_t *data)
     return ESP_OK;
 }
 
-esp_err_t calculate_diffential(odometry_data_t *data)
+esp_err_t odometry_calculate_differential(odometry_data_t *data)
 {
     ESP_RETURN_ON_FALSE(data != NULL, ESP_ERR_INVALID_STATE, TAG, "Null data to calculate diffential");
 
@@ -118,7 +111,7 @@ static void odometry_update_pose_loop(void *args)
     g_vehicle_pose.x.cur_value += WHEEL_RADIUS * (phi_sum / 2) * cos(g_vehicle_pose.theta.cur_value);
     g_vehicle_pose.y.cur_value += WHEEL_RADIUS * (phi_sum / 2) * sin(g_vehicle_pose.theta.cur_value);
 
-    ESP_ERROR_CHECK(calculate_diffential(&g_vehicle_pose));
+    ESP_ERROR_CHECK(odometry_calculate_differential(&g_vehicle_pose));
 
     ESP_ERROR_CHECK(odometry_send2_data_queue(&g_vehicle_pose));
 }
@@ -159,8 +152,6 @@ void odometry_get_traction_data(void)
 /* Event handlers */
 esp_err_t odometry_stop_event_handler(void)
 {
-    ESP_RETURN_ON_FALSE(g_odometry_timer_handle != NULL, ESP_ERR_INVALID_STATE, TAG, "Timer handle is NULL");
-
     if (!esp_timer_is_active(g_odometry_timer_handle))
     {
         ESP_LOGW(TAG, "Odometry timer already stopped");
@@ -175,8 +166,6 @@ esp_err_t odometry_stop_event_handler(void)
 
 esp_err_t odometry_start_event_handler(void)
 {
-    ESP_RETURN_ON_FALSE(g_odometry_timer_handle != NULL, ESP_ERR_INVALID_STATE, TAG, "Timer handle is NULL");
-
     if (esp_timer_is_active(g_odometry_timer_handle))
     {
         ESP_LOGW(TAG, "Odometry timer already started");
@@ -190,6 +179,7 @@ esp_err_t odometry_start_event_handler(void)
     return ESP_OK;
 }
 
+/* Main task */
 void odometry_event_handler(void)
 {
     static odometry_cmd_e cmd;
@@ -199,10 +189,12 @@ void odometry_event_handler(void)
         switch (cmd)
         {
         case ODO_CMD_START:
+            ESP_LOGI(TAG, "Event: Start process");
             if (odometry_start_event_handler() != ESP_OK)
                 ESP_LOGE(TAG, "Error starting odometry loop");
             break;
         case ODO_CMD_STOP:
+            ESP_LOGI(TAG, "Event: Stop process");
             if (odometry_stop_event_handler() != ESP_OK)
                 ESP_LOGE(TAG, "Error stopping odometry loop");
             break;

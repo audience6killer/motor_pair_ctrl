@@ -30,6 +30,13 @@ typedef struct
 } tract_ctrl_cmd_t;
 
 /**
+ * @brief Get current state of the task 
+ * 
+ * @return motor_pair_state_e 
+ */
+motor_pair_state_e tract_ctrl_get_current_state(void);
+
+/**
  * @brief Get the data queue for the traction control
  *
  * @return QueueHandle_t

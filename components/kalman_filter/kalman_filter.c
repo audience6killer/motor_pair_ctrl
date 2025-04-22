@@ -106,14 +106,14 @@ esp_err_t kalman_start_event_handler(void)
         return ESP_OK;
     }
 
-    g_kalman_state = KALMAN_STATE_STARTED;
     odometry_cmd_e cmd_odo = ODO_CMD_START;
-    if(xQueueSend(g_odometry_cmd_queue, &cmd_odo, pdMS_TO_TICKS(100)) == pdPASS)
+    if(xQueueSend(g_odometry_cmd_queue, &cmd_odo, pdMS_TO_TICKS(100)) != pdPASS)
     {
-        ESP_LOGI(TAG, "odometry started successfully");
-    
+        ESP_LOGE(TAG, "Error: Sending start cmd to odometry");
+        return ESP_FAIL;
     }
 
+    g_kalman_state = KALMAN_STATE_STARTED;
     ESP_LOGI(TAG, "Process started");
     return ESP_OK;
 }
@@ -126,12 +126,14 @@ esp_err_t kalman_stop_event_handler(void)
         return ESP_OK;
     }
 
+    /* Stop sources process*/
     odometry_cmd_e cmd_odo = ODO_CMD_STOP;
-    if(xQueueSend(g_odometry_cmd_queue, &cmd_odo, pdMS_TO_TICKS(100)) == pdPASS)
+    if(xQueueSend(g_odometry_cmd_queue, &cmd_odo, pdMS_TO_TICKS(100)) != pdPASS)
     {
-        ESP_LOGI(TAG, "odometry stopped successfully");
-    
+        ESP_LOGE(TAG, "Error: Sending stop cmd to odometry");
+        return ESP_FAIL;
     }
+
     g_kalman_state = KALMAN_STATE_STOPPED;
     ESP_LOGI(TAG, "Process stopped");
     return ESP_OK;
@@ -145,10 +147,12 @@ void kalman_event_handler(void)
         switch (cmd)
         {
         case KALMAN_CMD_STOP:
+            ESP_LOGI(TAG, "Event: Stop event");
             kalman_stop_event_handler();
             break;
 
         case KALMAN_CMD_START:
+            ESP_LOGI(TAG, "Event: Start event");
             kalman_start_event_handler();
             break;
 

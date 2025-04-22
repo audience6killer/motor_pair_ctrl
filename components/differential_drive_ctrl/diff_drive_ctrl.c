@@ -414,7 +414,6 @@ static void diff_drive_ctrl_task(void *pvParameters)
 
     for (;;)
     {
-        /* TODO: THere is a problem in this condition */
         if (g_diff_drive_state == DD_STATE_ORIENTING || g_diff_drive_state == DD_STATE_NAVIGATING)
         {
             diff_drive_receive_kalman_data();
@@ -428,7 +427,7 @@ static void diff_drive_ctrl_task(void *pvParameters)
 
 void diff_drive_ctrl_task_start(void)
 {
-    ESP_LOGI(TAG, "Initializing navigation task");
+    ESP_LOGI(TAG, "Starting navigation task");
 
     xTaskCreatePinnedToCore(&diff_drive_ctrl_task, "navigation_unit", DIFF_DRIVE_STACK_SIZE, NULL, DIFF_DRIVE_TASK_PRIORITY, NULL, DIFF_DRIVE_CORE_ID);
 }

@@ -232,6 +232,11 @@ esp_err_t data_center_parse_data(char *data)
     return ESP_OK;
 }
 
+static void data_center_recolect_data(void *args)
+{
+    
+}
+
 static void data_center_receive_task(void *args)
 {
     ESP_LOGI(TAG, "Iniatiliazing data center receiving task");
@@ -259,51 +264,22 @@ static void data_center_send_task(void *args)
 {
     ESP_LOGI(TAG, "Iniatiliazing sendig task");
 
-    // Data sources
-    QueueHandle_t tract_ctrl_data_queue = NULL;
-    QueueHandle_t kalman_data_queue = NULL;
-    ESP_ERROR_CHECK(tract_ctrl_get_data_queue(&tract_ctrl_data_queue));
-    ESP_ERROR_CHECK(kalman_get_data_queue(&kalman_data_queue));
-
-    // LoRa queues
-    ESP_ERROR_CHECK(lora_get_queue_data2send(&g_lora_data2send_queue));
-
-    kalman_initialize_info(&kalman_data);
-    motor_pair_init_data(&traction_data);
-
     esp_timer_create_args_t data_center_timer_args = {
-        .callback = data_center_send_data,
+        .callback = data_center_recolect_data,
         .arg = NULL,
-        .dispatch_method = ESP_TIMER_TASK,
+        .dispatch_method = ESP_TIMER_ISR,
         .name = "data_center_timer",
-        .skip_unhandled_events = false};
+        .skip_unhandled_events = false
+    };
 
     ESP_ERROR_CHECK(esp_timer_create(&data_center_timer_args, &g_data_center_timer));
 
+    ESP_LOGI(TAG, "Starting sending periodic timer");
+    ESP_ERROR_CHECK(esp_timer_start_periodic(g_data_center_timer, DATA_CENTER_SEND_PERIOD_MS));
+
     for (;;)
     {
-        if (g_data_center_send_status == SENDING)
-        {
-            int traction_code = xQueueReceive(tract_ctrl_data_queue, &traction_data, pdMS_TO_TICKS(100));
-            int kalman_code = xQueueReceive(kalman_data_queue, &kalman_data, pdMS_TO_TICKS(100));
-
-            if (traction_code == pdPASS && kalman_code == pdPASS)
-            {
-                g_data_center_sources = KALMAN_AND_TRACTION_DATA;
-            }
-            else if (traction_code == pdPASS)
-            {
-                g_data_center_sources = TRACTION_DATA;
-            }
-            else if (kalman_code == pdPASS)
-            {
-                g_data_center_sources = KALMAN_DATA;
-            }
-            else
-            {
-                g_data_center_sources = NONE;
-            }
-        }
+        
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }

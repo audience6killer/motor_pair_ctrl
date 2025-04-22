@@ -32,7 +32,6 @@ esp_err_t waypoint_get_state_queue_handle(QueueHandle_t *handle)
 
 esp_err_t waypoint_get_cmd_queue_handle(QueueHandle_t *handle)
 {
-    //ESP_RETURN_ON_FALSE(g_waypoint_cmd_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "CMD queue not initialized");
 
     *handle = g_waypoint_cmd_queue;
     return ESP_OK;
@@ -40,13 +39,11 @@ esp_err_t waypoint_get_cmd_queue_handle(QueueHandle_t *handle)
 
 esp_err_t waypoint_send2queue(waypoint_state_e state)
 {
-    //ESP_RETURN_ON_FALSE(g_waypoint_state_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "trying to send msg when queue is null");
-
     g_waypoint_state = state;
     if (xQueueSend(g_waypoint_state_queue, &state, pdMS_TO_TICKS(100)) != pdPASS)
     {
         ESP_LOGE(TAG, "Error sending to queue");
-        //return ESP_FAIL;
+        return ESP_FAIL;
     }
 
     return ESP_OK;
@@ -112,29 +109,29 @@ void waypoint_receive_from_diff_drive(void)
 }
 
 /* Event handlers */
-void waypoint_start_event_handler(void)
+esp_err_t waypoint_start_event_handler(void)
 {
-    ESP_LOGI(TAG, "Start event received");
     if (g_waypoint_state == WP_NAVIGATING)
     {
         ESP_LOGW(TAG, "Trajectory already started!");
-        return;
+        return ESP_OK;
     }
     if (g_navigation_points.size() == 0)
     {
         ESP_LOGE(TAG, "There are no navigation points!");
-        return;
+        return ESP_FAIL;
     }
 
-    // Start diff drive
+    /* Start diff drive */
     diff_drive_cmd_t cmd = {
         .cmd = DD_CMD_START,
         .point = NULL,
     };
 
-    if (xQueueSend(g_diff_drive_cmd_queue, &cmd, pdMS_TO_TICKS(100)))
+    if (xQueueSend(g_diff_drive_cmd_queue, &cmd, pdMS_TO_TICKS(100)) != pdPASS)
     {
-        ESP_LOGI(TAG, "Diff drive process started successfully!");
+        ESP_LOGE(TAG, "Error: Cannot send start command to diff_drive");
+        return ESP_FAIL;
     }
 
     /* Send first point */
@@ -148,39 +145,47 @@ void waypoint_start_event_handler(void)
 
     if (xQueueSend(g_diff_drive_cmd_queue, &point_cmd, pdMS_TO_TICKS(100)) != pdPASS)
     {
-        ESP_LOGE(TAG, "Error sending first point to diff drive");
-        return;
+        ESP_LOGE(TAG, "Error: Cannot send first point to diff_drive");
+        return ESP_FAIL;
     }
 
     ESP_LOGI(TAG, "First point in trajectory sended: (%.4f, %.4f, %.4f)", point.x, point.y, point.theta);
-    ESP_ERROR_CHECK(waypoint_send2queue(WP_NAVIGATING));
-    // waypoint_start_trajectory();
+    if (waypoint_send2queue(WP_NAVIGATING) != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Error: Cannot send state to queue");
+        return ESP_FAIL;
+    }
+
+    return ESP_OK;
 }
 
-void waypoint_stop_event_handler(void)
+esp_err_t waypoint_stop_event_handler(void)
 {
-    ESP_LOGI(TAG, "Stop event received");
     if (g_waypoint_state == WP_STOPPED)
     {
         ESP_LOGW(TAG, "Trajectory has already stopped!");
-        return;
+        return ESP_FAIL;
     }
 
-    waypoint_send2queue(WP_STOPPED);
+    if (waypoint_send2queue(WP_STOPPED) != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Error: Cannot set stopped state");
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "Trayectory stopped with %d points left", g_navigation_points.size());
+
+    return ESP_OK;
 }
 
-void waypoint_receive_point_event_handler(navigation_point_t *point)
+esp_err_t waypoint_receive_point_event_handler(navigation_point_t *point)
 {
-    ESP_LOGI(TAG, "Receive point event received");
-
-    if (point == NULL)
-    {
-        ESP_LOGE(TAG, "Point to add was NULL");
-        return;
-    }
+    ESP_RETURN_ON_FALSE(point != NULL, ESP_ERR_INVALID_STATE, TAG, "Point received was null");
 
     waypoint_add_point(point->x, point->y, point->theta);
     ESP_LOGI(TAG, "Point added successfully");
+
+    return ESP_OK;
 }
 
 void waypoint_event_handler(void)
@@ -188,17 +193,21 @@ void waypoint_event_handler(void)
     static waypoint_cmd_t cmd;
     if (xQueueReceive(g_waypoint_cmd_queue, &cmd, pdMS_TO_TICKS(20)) == pdPASS)
     {
+        // TODO Error handling in the state machine
         switch (cmd.cmd)
         {
         case WP_CMD_START_TRAJ:
+            ESP_LOGI(TAG, "Event: Start Trajectory");
             waypoint_start_event_handler();
             break;
 
         case WP_CMD_STOP_TRAJ:
+            ESP_LOGI(TAG, "Event: Stop Trajectory");
             waypoint_stop_event_handler();
             break;
 
         case WP_CMD_RECEIVE_POINT:
+            ESP_LOGI(TAG, "Event: Receive Point");
             waypoint_receive_point_event_handler(cmd.point);
             break;
         default:
