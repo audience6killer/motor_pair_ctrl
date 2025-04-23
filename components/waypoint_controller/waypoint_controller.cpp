@@ -21,6 +21,8 @@ static QueueHandle_t g_diff_drive_data_queue = NULL;
 static std::queue<navigation_point_t> g_navigation_points;
 static waypoint_state_e g_waypoint_state = WP_STOPPED;
 static esp_timer_handle_t g_next_point_timer;
+static EventGroupHandle_t g_event_group_handle = NULL;
+static EventGroupHandle_t g_error_group_handle = NULL;
 
 esp_err_t waypoint_get_state_queue_handle(QueueHandle_t *handle)
 {
@@ -34,6 +36,24 @@ esp_err_t waypoint_get_cmd_queue_handle(QueueHandle_t *handle)
 {
 
     *handle = g_waypoint_cmd_queue;
+    return ESP_OK;
+}
+
+esp_err_t waypoint_get_event_group(EventGroupHandle_t *handle)
+{
+    ESP_RETURN_ON_FALSE(g_event_group_handle != NULL, ESP_ERR_INVALID_STATE, TAG, "Event group is null while retraving");
+
+    *handle = g_event_group_handle;
+
+    return ESP_OK;
+}
+
+esp_err_t waypoint_get_error_group(EventGroupHandle_t *handle)
+{
+    ESP_RETURN_ON_FALSE(g_error_group_handle != NULL, ESP_ERR_INVALID_STATE, TAG, "Error event group is null while retraving");
+
+    *handle = g_error_group_handle;
+
     return ESP_OK;
 }
 
@@ -113,12 +133,15 @@ esp_err_t waypoint_start_event_handler(void)
 {
     if (g_waypoint_state == WP_NAVIGATING)
     {
-        ESP_LOGW(TAG, "Trajectory already started!");
+        //ESP_LOGW(TAG, "Trajectory already started!");
+        xEventGroupSetBits(g_event_group_handle, WP_NAVIGATING);
         return ESP_OK;
     }
     if (g_navigation_points.size() == 0)
     {
-        ESP_LOGE(TAG, "There are no navigation points!");
+        //ESP_LOGE(TAG, "There are no navigation points!");
+        xEventGroupSetBits(g_event_group_handle, WP_ERROR);
+        xEventGroupSetBits(g_error_group_handle, WP_ERROR_EMPTY_NAV_POINTS);
         return ESP_FAIL;
     }
 
@@ -130,7 +153,9 @@ esp_err_t waypoint_start_event_handler(void)
 
     if (xQueueSend(g_diff_drive_cmd_queue, &cmd, pdMS_TO_TICKS(100)) != pdPASS)
     {
-        ESP_LOGE(TAG, "Error: Cannot send start command to diff_drive");
+        //ESP_LOGE(TAG, "Error: Cannot send start command to diff_drive");
+        xEventGroupSetBits(g_event_group_handle, WP_ERROR);
+        xEventGroupSetBits(g_error_group_handle, WP_ERROR_CANNOT_START_TRACT);
         return ESP_FAIL;
     }
 
@@ -145,7 +170,9 @@ esp_err_t waypoint_start_event_handler(void)
 
     if (xQueueSend(g_diff_drive_cmd_queue, &point_cmd, pdMS_TO_TICKS(100)) != pdPASS)
     {
-        ESP_LOGE(TAG, "Error: Cannot send first point to diff_drive");
+        //ESP_LOGE(TAG, "Error: Cannot send first point to diff_drive");
+        xEventGroupSetBits(g_event_group_handle, WP_ERROR);
+        xEventGroupSetBits(g_error_group_handle, WP_ERROR_CANNOT_SEND_FPOINT);
         return ESP_FAIL;
     }
 
@@ -153,8 +180,11 @@ esp_err_t waypoint_start_event_handler(void)
     if (waypoint_send2queue(WP_NAVIGATING) != ESP_OK)
     {
         ESP_LOGE(TAG, "Error: Cannot send state to queue");
-        return ESP_FAIL;
+        //return ESP_FAIL;
     }
+
+    /* Notify to parent task */
+    xEventGroupSetBits(g_event_group_handle, WP_NAVIGATING);
 
     return ESP_OK;
 }
@@ -164,7 +194,7 @@ esp_err_t waypoint_stop_event_handler(void)
     if (g_waypoint_state == WP_STOPPED)
     {
         ESP_LOGW(TAG, "Trajectory has already stopped!");
-        return ESP_FAIL;
+        return ESP_OK;
     }
 
     if (waypoint_send2queue(WP_STOPPED) != ESP_OK)
@@ -184,6 +214,8 @@ esp_err_t waypoint_receive_point_event_handler(navigation_point_t *point)
 
     waypoint_add_point(point->x, point->y, point->theta);
     ESP_LOGI(TAG, "Point added successfully");
+
+    xEventGroupSetBits(g_event_group_handle, WP_POINT_ADDED);
 
     return ESP_OK;
 }
@@ -246,6 +278,10 @@ static void waypoint_task(void *pvParameters)
     };
 
     ESP_ERROR_CHECK(esp_timer_create(&next_point_timer_args, &g_next_point_timer));
+
+    /* Initialize event groups */
+    g_event_group_handle = xEventGroupCreate();
+    g_error_group_handle = xEventGroupCreate();
 
     for (;;)
     {

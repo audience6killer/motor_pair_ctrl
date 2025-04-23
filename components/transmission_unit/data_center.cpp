@@ -37,7 +37,6 @@ static esp_timer_handle_t g_data_center_timer = NULL;
 static data_center_send_status_e g_data_center_send_status = STOPPED_TX;
 static data_center_reception_e g_data_center_reception_status = STOPPED_RX;
 static data_center_sources_e g_data_center_sources = NONE;
-static data_center_msg_t g_data_center_msg;
 
 esp_err_t data_center_get_queue_handle(QueueHandle_t *queue)
 {
@@ -171,12 +170,6 @@ esp_err_t data_center_stop_sending(void)
 
 esp_err_t data_center_send2queue(data_center_msg_t *msg)
 {
-    if (g_data_center_queue_handle == NULL)
-    {
-        ESP_LOGE(TAG, "Data center queue not initialized");
-        return ESP_FAIL;
-    }
-
     if (xQueueSend(g_data_center_queue_handle, msg, pdMS_TO_TICKS(100)) != pdPASS)
     {
         ESP_LOGE(TAG, "Error sending data to queue");
@@ -189,12 +182,12 @@ esp_err_t data_center_send2queue(data_center_msg_t *msg)
 /**
  * @brief The data received have the format: / * code,(char[3]),(args) * /
  * depending on the code there will be different args or none.
- * Examples: / *NVP,15.00,17.00* / -> Navigation point, x = 15.00, y = 17.00
+ * Examples: / *NVP,15.00,17.00,35.00* / -> Navigation point, x = 15.00, y = 17.00, theta = 35°
  *
  * @param data
  * @return esp_err_t
  */
-esp_err_t data_center_parse_data(char *data)
+esp_err_t data_center_parse_data(char *data, data_center_msg_t *msg)
 {
     char code[4];
 
@@ -208,25 +201,51 @@ esp_err_t data_center_parse_data(char *data)
     // Extract the code
     sscanf(data, "/*%3s", code);
 
-    // Check the code
-    if (strcmp(code, "NVP") == 0)
+    float x, y, theta;
+    x = y = theta = 0.0f;
+
+    msg->args[0] = msg->args[1] = msg->args[2] = 0.0f;
+
+    if (strcmp(code, "SPN") == 0) // SM_CMD_STOP_NAV
     {
-        float x, y;
-        sscanf(data, "/*%*s,%f,%f*/", &x, &y);
-        ESP_LOGI(TAG, "Navigation point received: x = %.2f, y = %.2f", x, y);
+        msg->code = SM_CMD_STOP_NAV;
+        ESP_LOGI(TAG, "Command received: STOP_NAV");
     }
-    else if (strcmp(code, "STN") == 0)
+    else if (strcmp(code, "STN") == 0) // SM_CMD_START_NAV
     {
-        ESP_LOGI(TAG, "Start navigation received");
+        msg->code = SM_CMD_START_NAV;
+        ESP_LOGI(TAG, "Command received: START_NAV");
     }
-    else if (strcmp(code, "SPN") == 0)
+    else if (strcmp(code, "PSN") == 0) // SM_CMD_PAUSE_NAV
     {
-        ESP_LOGI(TAG, "Stop navigation received");
+        msg->code = SM_CMD_PAUSE_NAV;
+        ESP_LOGI(TAG, "Command received: PAUSE_NAV");
+    }
+    else if (strcmp(code, "RMN") == 0) // SM_CMD_RESUME_NAV
+    {
+        msg->code = SM_CMD_RESUME_NAV;
+        ESP_LOGI(TAG, "Command received: RESUME_NAV");
+    }
+    else if (strcmp(code, "NVP") == 0) // SM_CMD_ADD_WAYPOINT
+    {
+        msg->code = SM_CMD_ADD_WAYPOINT;
+        sscanf(data, "/*%*s,%f,%f,%f*/", &msg->args[0], &msg->args[1], &msg->args[2]);
+        ESP_LOGI(TAG, "Command received: ADD_WAYPOINT, x = %.2f, y = %.2f, theta = %.2f", msg->args[0], msg->args[1], msg->args[2]);
+    }
+    else if (strcmp(code, "RST") == 0) // SM_CMD_RESET
+    {
+        msg->code = SM_CMD_RESET;
+        ESP_LOGI(TAG, "Command received: RESET");
+    }
+    else if (strcmp(code, "ECH") == 0) // SM_CMD_ECHO
+    {
+        msg->code = SM_CMD_ECHO;
+        ESP_LOGI(TAG, "Command received: ECHO");
     }
     else
     {
-        ESP_LOGE(TAG, "Invalid code");
-        return ESP_FAIL;
+        msg->code = SM_CMD_EMPTY;
+        ESP_LOGW(TAG, "Unknown command received: %s", code);
     }
 
     return ESP_OK;
@@ -234,7 +253,6 @@ esp_err_t data_center_parse_data(char *data)
 
 static void data_center_recolect_data(void *args)
 {
-    
 }
 
 static void data_center_receive_task(void *args)
@@ -245,15 +263,14 @@ static void data_center_receive_task(void *args)
     char received_data[RF_DATA_LENGTH];
     memset(received_data, 0, RF_DATA_LENGTH);
 
-    g_data_center_msg.code = EMPTY;
-    memset(g_data_center_msg.agrs, 0, sizeof(g_data_center_msg.agrs));
 
     for (;;)
     {
         if (xQueueReceive(g_lora_received_queue, received_data, pdMS_TO_TICKS(100)) == pdPASS)
         {
-            ESP_ERROR_CHECK(data_center_parse_data(received_data));
-            ESP_ERROR_CHECK(data_center_send2queue(&g_data_center_msg));
+            data_center_msg_t data_center_msg;
+            ESP_ERROR_CHECK(data_center_parse_data(received_data, &data_center_msg));
+            ESP_ERROR_CHECK(data_center_send2queue(&data_center_msg));
         }
 
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -269,8 +286,7 @@ static void data_center_send_task(void *args)
         .arg = NULL,
         .dispatch_method = ESP_TIMER_ISR,
         .name = "data_center_timer",
-        .skip_unhandled_events = false
-    };
+        .skip_unhandled_events = false};
 
     ESP_ERROR_CHECK(esp_timer_create(&data_center_timer_args, &g_data_center_timer));
 
@@ -279,7 +295,7 @@ static void data_center_send_task(void *args)
 
     for (;;)
     {
-        
+
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }

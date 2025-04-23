@@ -6,6 +6,8 @@ extern "C"
 {
 #endif
 
+#include "state_machine.h"
+
 typedef enum {
     STOPPED_TX = 0,
     SENDING 
@@ -16,17 +18,9 @@ typedef enum {
     RECEIVING
 } data_center_reception_e;
 
-typedef enum {
-    EMPTY = 0,
-    ECHO,       // Test communication
-    NAV_POINT,      // Send Navigation point
-    START_NAV,      // Start navigation
-    STOP_NAV,       // Stop navigation
-} data_center_rx_codes_e;   // Data center reception codes
-
 typedef struct {
-    data_center_rx_codes_e code;
-    float agrs[3];
+    state_machine_cmd_e code;
+    float args[3];
 } data_center_msg_t;
 
  // Task state

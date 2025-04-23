@@ -6,6 +6,8 @@ extern "C"
 #include "odometry_unit.h"
 #include "diff_drive_ctrl.h"
 #include "waypoint_controller.h"
+#include "state_machine.h"
+#include "fake_data_center.h"
     // #include "seed_planter_control.h"
     // #include "test_seed_planter.h"
 }
@@ -24,8 +26,11 @@ extern "C" void app_main(void)
     kalman_filter_start_task();
     diff_drive_ctrl_task_start();
     waypoint_start_task();
+    fake_data_center_task_start();
 
-    test_waypoint_follower_task_start();
+    state_machine_task_start();
+
+    // test_waypoint_follower_task_start();
     // seed_planter_control_start_task();
     // test_seed_planter_start_task();
 

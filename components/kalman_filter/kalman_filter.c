@@ -98,6 +98,7 @@ esp_err_t kalman_get_sources_data(void)
 }
 
 /* Event handlers */
+// TODO: Kalman and waypoint will communicate with state machine through event groups
 esp_err_t kalman_start_event_handler(void)
 {
     if (g_kalman_state == KALMAN_STATE_STARTED)

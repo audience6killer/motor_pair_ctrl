@@ -1,3 +1,3 @@
 idf_component_register(SRCS "state_machine.cpp"
                     INCLUDE_DIRS "include"
-                    REQUIRES transmission_unit waypoint_controller)
+                    REQUIRES transmission_unit waypoint_controller fake_data_center)

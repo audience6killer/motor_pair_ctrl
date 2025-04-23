@@ -1,0 +1,9 @@
+#ifndef FAKE_DATA_CENTER_TASK_COMMON_H
+#define FAKE_DATA_CENTER_TASK_COMMON_H
+
+#define FAKE_DC_TASK_CORE_ID        0
+#define FAKE_DC_TASK_PRIORITY       5
+#define FAKE_DC_TASK_STACK_SIZE     1024 * 3
+#define RF_DATA_LENGTH              200
+
+#endif  // FAKE_DATA_CENTER_TASK_COMMON_H

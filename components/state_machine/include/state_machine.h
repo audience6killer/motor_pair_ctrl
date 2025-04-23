@@ -7,27 +7,20 @@ extern "C"
 #endif
 
     typedef enum {
-        CMD_START = 0,
-        CMD_STOP,
-        CMD_RESET,
-        CMD_PAUSE,
-        CMD_RESUME,
-        CMD_WAYPOINT,
-        CMD_ECHO,
+        SM_CMD_EMPTY = 0, 
+        SM_CMD_STOP_NAV,        // SPN
+        SM_CMD_START_NAV,       // STN
+        SM_CMD_PAUSE_NAV,       // PSN
+        SM_CMD_RESUME_NAV,      // RMN
+        SM_CMD_ADD_WAYPOINT,    // NVP
+        SM_CMD_RESET,           // RST
+        SM_CMD_ECHO,            // ECH
     } state_machine_cmd_e; // Commands sended from the state machine
 
     typedef struct {
         state_machine_cmd_e code;
-        float agrs[3];
+        float args[3];
     } state_machine_msg_t;  
-
-    /**
-     * @brief Get queue handle 
-     * 
-     * @param handle 
-     * @return esp_err_t 
-     */
-    esp_err_t state_machine_get_queue_handle(QueueHandle_t *handle);
 
     /**
      * @brief Start the state machine task 
