@@ -91,6 +91,7 @@ esp_err_t odometry_send2_data_queue(odometry_data_t *data)
 
 static void odometry_update_pose_loop(void *args)
 {
+    ESP_LOGI(TAG, "IN LOOPPPPPP!");
     float phi_diff = g_vehicle_pose.phi_r.cur_value - g_vehicle_pose.phi_l.cur_value;
 
     phi_diff = TRACT_CONV_PULSES2RAD(phi_diff);
@@ -221,6 +222,7 @@ static void odometry_task(void *pvParameters)
         .callback = odometry_update_pose_loop,
         .arg = NULL,
         .name = "odometry_timer_loop",
+        .dispatch_method = ESP_TIMER_ISR,
     };
     ESP_ERROR_CHECK(esp_timer_create(&odometry_timer_args, &g_odometry_timer_handle));
 

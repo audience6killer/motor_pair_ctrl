@@ -3,6 +3,6 @@
 
 #define KALMAN_FILTER_STACK_SIZE            4096
 #define KALMAN_FILTER_CORE_ID               1
-#define KALMAN_FILTER_TASK_PRIORITY         12
+#define KALMAN_FILTER_TASK_PRIORITY         15
 
 #endif

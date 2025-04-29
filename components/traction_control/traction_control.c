@@ -248,6 +248,12 @@ esp_err_t tract_ctrl_start_event_handler(void)
         ESP_LOGW(TAG, "PID loop already started");
         return ESP_OK;
     }
+    //esp_err_t ret = esp_timer_start_periodic(g_traction_pid_timer, BDC_PID_LOOP_PERIOD_MS * 1000);
+
+    //if (ret != ESP_OK)
+    //    ESP_LOGE(TAG, "Error starting pid loop timer");
+    //else
+    //    ESP_LOGI(TAG, "PID loop timer started correctly");
 
     return ESP_OK;
 }
@@ -409,12 +415,12 @@ static void tract_ctrl_task(void *pvParameters)
     g_traction_cmd_queue = xQueueCreate(4, sizeof(tract_ctrl_cmd_t));
 
     ESP_LOGI(TAG, "Starting motor speed loop");
-    esp_err_t ret = esp_timer_start_periodic(g_traction_pid_timer, BDC_PID_LOOP_PERIOD_MS * 1000);
+    //esp_err_t ret = esp_timer_start_periodic(g_traction_pid_timer, BDC_PID_LOOP_PERIOD_MS * 1000);
 
-    if (ret != ESP_OK)
-        ESP_LOGE(TAG, "Error starting pid loop timer");
-    else
-        ESP_LOGI(TAG, "PID loop timer started correctly");
+    //if (ret != ESP_OK)
+    //    ESP_LOGE(TAG, "Error starting pid loop timer");
+    //else
+    //    ESP_LOGI(TAG, "PID loop timer started correctly");
 
     for (;;)
     {

@@ -103,6 +103,12 @@ void waypoint_trajectory_ctrl(void *args)
         {
             g_waypoint_state = WP_TRJ_FINISHED;
             waypoint_state_e state = g_waypoint_state;
+            diff_drive_cmd_t point_cmd = {
+                .cmd = DD_CMD_STOP,
+                .point = NULL,
+            };
+            xQueueSendFromISR(g_diff_drive_cmd_queue, &point_cmd, NULL);
+
             xQueueSendFromISR(g_waypoint_state_queue, &state, NULL);
         }
     }

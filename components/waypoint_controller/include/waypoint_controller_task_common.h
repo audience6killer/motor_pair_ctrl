@@ -3,7 +3,7 @@
 
 #define WAYPOINT_STACK_SIZE      9046
 #define WAYPOINT_CORE_ID         0
-#define WAYPOINT_PRIORITY        10
+#define WAYPOINT_PRIORITY        15
 
 #define WAYPOINT_NXT_POINT_WAIT  2E6     // 1 second
 

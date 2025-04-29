@@ -229,7 +229,7 @@ void diff_drive_receive_kalman_data(void)
         .theta_p = 0.0f,
     };
 
-    if (xQueueReceive(g_kalman_data_queue, &vehicle_pose, pdMS_TO_TICKS(20)) == pdPASS)
+    if (xQueueReceive(g_kalman_data_queue, &vehicle_pose, pdMS_TO_TICKS(5)) == pdPASS)
     {
             //printf("kalman received in diff_drive\n");
 
