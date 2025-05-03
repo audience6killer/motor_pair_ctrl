@@ -66,7 +66,7 @@ esp_err_t initialize_odometry_data(odometry_data_t *data)
 
 esp_err_t odometry_calculate_differential(odometry_data_t *data)
 {
-    ESP_RETURN_ON_FALSE(data != NULL, ESP_ERR_INVALID_STATE, TAG, "Null data to calculate diffential");
+    //ESP_RETURN_ON_FALSE(data != NULL, ESP_ERR_INVALID_STATE, TAG, "Null data to calculate diffential");
 
     data->x.diff_value = (data->x.cur_value - data->x.past_value) / 10E-2;
     data->y.diff_value = (data->y.cur_value - data->y.past_value) / 10E-2;
@@ -81,7 +81,7 @@ esp_err_t odometry_send2_data_queue(odometry_data_t *data)
 {
     ESP_RETURN_ON_FALSE(data != NULL, ESP_ERR_INVALID_STATE, TAG, "Null data to send to queue");
 
-    if (xQueueSend(g_odometry_data_queue, data, portMAX_DELAY) != pdPASS)
+    if (xQueueSend(g_odometry_data_queue, data, pdMS_TO_TICKS(20)) != pdPASS)
     {
         ESP_LOGE(TAG, "Error sending queue");
     }
@@ -89,9 +89,10 @@ esp_err_t odometry_send2_data_queue(odometry_data_t *data)
     return ESP_OK;
 }
 
+/* ISR routine */
 static void odometry_update_pose_loop(void *args)
 {
-    ESP_LOGI(TAG, "IN LOOPPPPPP!");
+    // ESP_LOGI(TAG, "IN LOOPPPPPP!");
     float phi_diff = g_vehicle_pose.phi_r.cur_value - g_vehicle_pose.phi_l.cur_value;
 
     phi_diff = TRACT_CONV_PULSES2RAD(phi_diff);
@@ -112,9 +113,11 @@ static void odometry_update_pose_loop(void *args)
     g_vehicle_pose.x.cur_value += WHEEL_RADIUS * (phi_sum / 2) * cos(g_vehicle_pose.theta.cur_value);
     g_vehicle_pose.y.cur_value += WHEEL_RADIUS * (phi_sum / 2) * sin(g_vehicle_pose.theta.cur_value);
 
-    ESP_ERROR_CHECK(odometry_calculate_differential(&g_vehicle_pose));
+    odometry_calculate_differential(&g_vehicle_pose);
 
-    ESP_ERROR_CHECK(odometry_send2_data_queue(&g_vehicle_pose));
+    //odometry_send2_data_queue(&g_vehicle_pose);
+    odometry_data_t data = g_vehicle_pose;
+    xQueueSendFromISR(g_odometry_data_queue, &data, NULL);
 }
 
 esp_err_t odometry_calculate_pose(motor_pair_data_t r_data)
@@ -147,6 +150,9 @@ void odometry_get_traction_data(void)
     if (xQueueReceive(g_traction_data_queue, &traction_data, pdMS_TO_TICKS(10)))
     {
         odometry_calculate_pose(traction_data);
+
+        /*ESP_LOGI(TAG, "Traction Data: mleft_pulses=%d, mright_pulses=%d, mleft_set_point=%d, mright_set_point=%d\n",
+                 traction_data.mleft_pulses, traction_data.mright_pulses, traction_data.mleft_set_point, traction_data.mright_set_point);*/
     }
 }
 

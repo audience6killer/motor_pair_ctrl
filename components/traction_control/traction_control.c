@@ -167,6 +167,8 @@ static void traction_pid_loop_cb(void *args)
         pid_compute(g_traction_handle->motor_right_ctx.pid_ctrl, motor_right_error, &motor_right_new_speed);
         pid_compute(g_traction_handle->motor_left_ctx.pid_ctrl, motor_left_error, &motor_left_new_speed);
 
+        //printf("(%.4f, %.4f)\n", motor_left_new_speed, motor_right_new_speed);
+
         ESP_ERROR_CHECK(bdc_motor_set_speed(g_traction_handle->motor_right_ctx.motor, (uint32_t)motor_right_new_speed));
         ESP_ERROR_CHECK(bdc_motor_set_speed(g_traction_handle->motor_left_ctx.motor, (uint32_t)motor_left_new_speed));
     }
@@ -248,12 +250,12 @@ esp_err_t tract_ctrl_start_event_handler(void)
         ESP_LOGW(TAG, "PID loop already started");
         return ESP_OK;
     }
-    //esp_err_t ret = esp_timer_start_periodic(g_traction_pid_timer, BDC_PID_LOOP_PERIOD_MS * 1000);
+    esp_err_t ret = esp_timer_start_periodic(g_traction_pid_timer, BDC_PID_LOOP_PERIOD_MS * 1000);
 
-    //if (ret != ESP_OK)
-    //    ESP_LOGE(TAG, "Error starting pid loop timer");
-    //else
-    //    ESP_LOGI(TAG, "PID loop timer started correctly");
+    if (ret != ESP_OK)
+        ESP_LOGE(TAG, "Error starting pid loop timer");
+    else
+        ESP_LOGI(TAG, "PID loop timer started correctly");
 
     return ESP_OK;
 }
@@ -287,7 +289,10 @@ esp_err_t tract_ctrl_set_speed_event_handler(float *mleft_speed_pv, float *mrigh
         else if (mleft_speed > 0.0f && mright_speed > 0.0f)
             tract_ctrl_set_direction(FORWARD);
         else
-            tract_ctrl_set_direction(BRAKE);
+        {
+            printf("(%.4f, %.4f)\n", mleft_speed, mright_speed);
+            //tract_ctrl_set_direction(BRAKE);
+        }
 
         motor_pair_set_speed((int)roundf(TRACT_CONV_REV2PULSES(mleft_abs)), (int)roundf(TRACT_CONV_REV2PULSES(mright_abs)), g_traction_handle);
     }
@@ -406,21 +411,23 @@ static void tract_ctrl_task(void *pvParameters)
         .mright_set_point = 0.0f,
     };
 
-    // Set initial speed
-    // float initial_speed = 0.0f;
-    // tract_ctrl_set_speed_event_handler(&initial_speed, &initial_speed);
 
     // Setting up queue
     g_traction_data_queue = xQueueCreate(4, sizeof(motor_pair_data_t));
     g_traction_cmd_queue = xQueueCreate(4, sizeof(tract_ctrl_cmd_t));
 
     ESP_LOGI(TAG, "Starting motor speed loop");
-    //esp_err_t ret = esp_timer_start_periodic(g_traction_pid_timer, BDC_PID_LOOP_PERIOD_MS * 1000);
+    esp_err_t ret = esp_timer_start_periodic(g_traction_pid_timer, BDC_PID_LOOP_PERIOD_MS * 1000);
 
-    //if (ret != ESP_OK)
-    //    ESP_LOGE(TAG, "Error starting pid loop timer");
-    //else
-    //    ESP_LOGI(TAG, "PID loop timer started correctly");
+    // Set initial speed
+    float initial_speed = 0.0f;
+    tract_ctrl_set_speed_event_handler(&initial_speed, &initial_speed);
+
+
+    if (ret != ESP_OK)
+        ESP_LOGE(TAG, "Error starting pid loop timer");
+    else
+        ESP_LOGI(TAG, "PID loop timer started correctly");
 
     for (;;)
     {

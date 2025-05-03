@@ -209,6 +209,19 @@ esp_err_t waypoint_stop_event_handler(void)
         return ESP_FAIL;
     }
 
+    diff_drive_cmd_t cmd = {
+        .cmd = DD_CMD_STOP,
+        .point = NULL,
+    };
+
+    if (xQueueSend(g_diff_drive_cmd_queue, &cmd, pdMS_TO_TICKS(100)) != pdPASS)
+    {
+        //ESP_LOGE(TAG, "Error: Cannot send first point to diff_drive");
+        xEventGroupSetBits(g_event_group_handle, WP_ERROR);
+        xEventGroupSetBits(g_error_group_handle, WP_ERROR_CANNOT_STOP_TRACT);
+        return ESP_FAIL;
+    }
+
     ESP_LOGI(TAG, "Trayectory stopped with %d points left", g_navigation_points.size());
 
     return ESP_OK;

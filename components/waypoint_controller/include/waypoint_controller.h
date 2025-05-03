@@ -30,6 +30,7 @@ extern "C"
         WP_ERROR_CANNOT_START_TRACT = BIT1,
         WP_ERROR_CANNOT_SEND_FPOINT = BIT2,
         WP_ERROR_CANNOT_ADD_POINT = BIT3,
+        WP_ERROR_CANNOT_STOP_TRACT = BIT4,
     } waypoint_error_e;
 
     typedef enum

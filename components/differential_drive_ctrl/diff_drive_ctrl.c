@@ -61,6 +61,7 @@ esp_err_t diff_drive_orientation_control(float theta_error)
 
     float left_speed = (float)RADS2REVS((-1.0f) * phi_p);
     float right_speed = (float)RADS2REVS(phi_p);
+    // printf("phi_lpo: %f, phi_rpo: %f\n", phi_p, phi_p);
     tract_ctrl_cmd_t cmd = {
         .cmd = TRACT_CTRL_CMD_SET_SPEED,
         .motor_left_speed = &left_speed,
@@ -88,11 +89,13 @@ esp_err_t diff_drive_position_control(float theta_error)
     phi_lp = MIN(MAX(phi_lp, -V_MAX_RADS), V_MAX_RADS);
     phi_rp = MIN(MAX(phi_rp, -V_MAX_RADS), V_MAX_RADS);
 
-    // printf("wheel_angular_vel,%f,", wheel_angular_vel);
+    // printf("wheel_angular_vel,%f\r\n", wheel_angular_vel);
     // printf("phi_lp: %f, phi_rp: %f\n", phi_lp, phi_rp);
 
     float left_speed = (float)RADS2REVS(phi_lp);
     float right_speed = (float)RADS2REVS(phi_rp);
+
+    // printf("phi_lpp: %f, phi_rpp: %f\n", left_speed, right_speed);
 
     tract_ctrl_cmd_t cmd = {
         .cmd = TRACT_CTRL_CMD_SET_SPEED,
@@ -170,7 +173,7 @@ esp_err_t diff_drive_point_follower(kalman_info_t *c_pose)
 
 esp_err_t diff_drive_set_navigation_point(navigation_point_t point)
 {
-    //printf("STATE: %d\n", g_diff_drive_state);
+    // printf("STATE: %d\n", g_diff_drive_state);
     ESP_RETURN_ON_FALSE(g_diff_drive_state == DD_STATE_POINT_REACHED || g_diff_drive_state == DD_STATE_STARTED, ESP_ERR_INVALID_STATE, TAG, "Trying to change nav point before trajectory is compleated");
 
     ESP_LOGI(TAG, "New desired pose: (%.4f, %.4f, %.2f)\r\n", point.x, point.y, point.theta);
@@ -228,14 +231,21 @@ void diff_drive_receive_kalman_data(void)
         .z_p = 0.0f,
         .theta_p = 0.0f,
     };
+    static int counter = 0;
 
     if (xQueueReceive(g_kalman_data_queue, &vehicle_pose, pdMS_TO_TICKS(5)) == pdPASS)
     {
-            //printf("kalman received in diff_drive\n");
+        // printf("kalman received in diff_drive\n");
+        if (counter % 100 == 0)
+        {
 
-#if false 
+#if true 
             printf("/*x,%f,xd,%f,y,%f,yd,%f,theta,%f,thetad,%f,state,%d*/\r\n", vehicle_pose.x, g_current_point.x, vehicle_pose.y, g_current_point.y, vehicle_pose.theta, g_current_point.theta, g_diff_drive_state);
 #endif
+        }
+
+        counter++;
+
         if (g_diff_drive_state != DD_STATE_POINT_REACHED)
             ESP_ERROR_CHECK(diff_drive_point_follower(&vehicle_pose));
     }
