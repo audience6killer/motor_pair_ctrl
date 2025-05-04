@@ -238,7 +238,7 @@ void diff_drive_receive_kalman_data(void)
         // printf("kalman received in diff_drive\n");
         if (counter % 100 == 0)
         {
-
+            counter = 0;
 #if true 
             printf("/*x,%f,xd,%f,y,%f,yd,%f,theta,%f,thetad,%f,state,%d*/\r\n", vehicle_pose.x, g_current_point.x, vehicle_pose.y, g_current_point.y, vehicle_pose.theta, g_current_point.theta, g_diff_drive_state);
 #endif
