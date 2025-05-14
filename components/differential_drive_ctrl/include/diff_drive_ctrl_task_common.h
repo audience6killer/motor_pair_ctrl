@@ -3,8 +3,8 @@
 
 
 #define DIFF_DRIVE_STACK_SIZE          4096
-#define DIFF_DRIVE_CORE_ID             0
-#define DIFF_DRIVE_TASK_PRIORITY       15 
+#define DIFF_DRIVE_CORE_ID             1
+#define DIFF_DRIVE_TASK_PRIORITY       20 
 
 /* Originales */
 // #define DIFF_DRIVE_POS_KP              0.8f

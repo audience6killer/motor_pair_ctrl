@@ -13,7 +13,7 @@
 #define BDC_PID_LOOP_PERIOD_MS              10
 
 #define TRACT_MOTORS_MCPWM_GROUP            0
-#define TRACT_MOTORS_PWM_FREQ               20000       // 25kHz PWM
+#define TRACT_MOTORS_PWM_FREQ               20000       // 20kHz PWM
 
 #define TRACT_ML_PWMA                       27
 #define TRACT_ML_PWMB                       14
@@ -22,19 +22,20 @@
 
 #define TRACT_MR_PWMA                        33
 #define TRACT_MR_PWMB                        32
-#define TRACT_MR_ENCODER_A                   35
-#define TRACT_MR_ENCODER_B                   34
+#define TRACT_MR_ENCODER_A                   34
+#define TRACT_MR_ENCODER_B                   35
 
 #define MOTOR1_ENCODER_RES                  908
 #define MOTOR2_ENCODER_RES                  908
 
-#define TRACT_ML_KP                         0.01f
-#define TRACT_ML_KI                         0.2f
-#define TRACT_ML_KD                         0.2f
+#define TRACT_ML_KP                         0.001f
+#define TRACT_ML_KI                         0.009f
+#define TRACT_ML_KD                         0.20f
 
-#define TRACT_MR_KP                         0.01f
-#define TRACT_MR_KI                         0.2f
-#define TRACT_MR_KD                         0.2f
+#define TRACT_MR_KP                         0.10f
+#define TRACT_MR_KI                         0.10f
+#define TRACT_MR_KD                         0.20f
+
 /* Originales */
 //#define TRACT_ML_KP                         0.65f
 //#define TRACT_ML_KI                         0.54f

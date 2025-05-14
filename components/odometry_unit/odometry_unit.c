@@ -4,8 +4,8 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 #include "esp_log.h"
-#include "esp_timer.h"
 #include "esp_check.h"
+#include "esp_timer.h"
 
 #include "odometry_unit.h"
 #include "odometry_task_common.h"
@@ -88,44 +88,6 @@ esp_err_t odometry_send_to_data_queue(odometry_data_t *data)
     return ESP_OK;
 }
 
-/* ISR routine */
-static void odometry_update_pose_loop(void *args)
-{
-    static int64_t prev_time = 0;
-    int64_t c_time = esp_timer_get_time();
-    int64_t delta_t = c_time - prev_time;
-    prev_time = c_time;
-
-    ESP_LOGI(TAG, "Time elapsed since last execution: %lld microseconds", delta_t);
-
-    // ESP_LOGI(TAG, "IN LOOPPPPPP!");
-    float phi_diff = g_vehicle_pose.phi_r.cur_value - g_vehicle_pose.phi_l.cur_value;
-
-    phi_diff = TRACT_CONV_PULSES2RAD(phi_diff);
-
-    float delta_phi_r = g_vehicle_pose.phi_r.cur_value - g_vehicle_pose.phi_r.past_value;
-    float delta_phi_l = g_vehicle_pose.phi_l.cur_value - g_vehicle_pose.phi_l.past_value;
-
-    float phi_sum = delta_phi_l + delta_phi_r;
-    phi_sum = TRACT_CONV_PULSES2RAD(phi_sum);
-
-    // Update N-1 pose
-    g_vehicle_pose.phi_l.past_value = g_vehicle_pose.phi_l.cur_value;
-    g_vehicle_pose.phi_r.past_value = g_vehicle_pose.phi_r.cur_value;
-
-    // Update pose parameters
-    g_vehicle_pose.theta.past_value = g_vehicle_pose.theta.cur_value;
-    g_vehicle_pose.theta.cur_value = WHEEL_RADIUS * phi_diff / (2 * WHEEL_DISTANCE_TO_CM);
-    g_vehicle_pose.x.cur_value += WHEEL_RADIUS * (phi_sum / 2) * cos(g_vehicle_pose.theta.cur_value);
-    g_vehicle_pose.y.cur_value += WHEEL_RADIUS * (phi_sum / 2) * sin(g_vehicle_pose.theta.cur_value);
-
-    //odometry_calculate_differential(&g_vehicle_pose);
-
-    //odometry_send_to_data_queue(&g_vehicle_pose);
-    odometry_data_t data = g_vehicle_pose;
-    xQueueSendFromISR(g_odometry_data_queue, &data, NULL);
-}
-
 esp_err_t odometry_update_pose(motor_pair_data_t r_data)
 {
     /* Get time differential between executions */
@@ -192,8 +154,7 @@ void odometry_get_traction_data(void)
     {
         odometry_update_pose(traction_data);
 
-        /*ESP_LOGI(TAG, "Traction Data: mleft_pulses=%d, mright_pulses=%d, mleft_set_point=%d, mright_set_point=%d\n",
-                 traction_data.mleft_pulses, traction_data.mright_pulses, traction_data.mleft_set_point, traction_data.mright_set_point);*/
+        //printf("/*%d,%d,%d,%d*/\n",traction_data.mleft_set_point, traction_data.mleft_pulses, traction_data.mright_set_point, traction_data.mright_pulses);
     }
 }
 

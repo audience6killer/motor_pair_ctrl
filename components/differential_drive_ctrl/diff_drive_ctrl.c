@@ -61,7 +61,7 @@ esp_err_t diff_drive_orientation_control(float theta_error)
 
     float left_speed = (float)RADS2REVS((-1.0f) * phi_p);
     float right_speed = (float)RADS2REVS(phi_p);
-    // printf("phi_lpo: %f, phi_rpo: %f\n", phi_p, phi_p);
+    //printf("phi_lpo: %f, phi_rpo: %f\n", phi_p, phi_p);
     tract_ctrl_cmd_t cmd = {
         .cmd = TRACT_CTRL_CMD_SET_SPEED,
         .motor_left_speed = &left_speed,
@@ -239,7 +239,7 @@ void diff_drive_receive_kalman_data(void)
         if (counter % 100 == 0)
         {
             counter = 0;
-#if true 
+#if false 
             printf("/*x,%f,xd,%f,y,%f,yd,%f,theta,%f,thetad,%f,state,%d*/\r\n", vehicle_pose.x, g_current_point.x, vehicle_pose.y, g_current_point.y, vehicle_pose.theta, g_current_point.theta, g_diff_drive_state);
 #endif
         }

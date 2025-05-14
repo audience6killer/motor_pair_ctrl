@@ -9,6 +9,7 @@
 #include "esp_check.h"
 #include "stdbool.h"
 #include "string.h"
+#include "driver/gptimer.h"
 
 #include "traction_control.h"
 #include "traction_task_common.h"
@@ -26,6 +27,7 @@ static QueueHandle_t g_traction_data_queue;
 static motor_pair_state_e g_traction_state = STOPPED;
 static motor_pair_data_t traction_data;
 static esp_timer_handle_t g_traction_pid_timer = NULL;
+static gptimer_handle_t g_traction_pid_gptimer = NULL;
 
 /**
  * @brief Control direction and speed of the motors
@@ -65,13 +67,23 @@ esp_err_t tract_ctrl_get_cmd_queue(QueueHandle_t *queue)
     return ESP_OK;
 }
 
-static void traction_pid_loop_cb(void *args)
+bool traction_pid_loop_cb(gptimer_handle_t timer, const gptimer_alarm_event_data_t *event_data, void *user_ctx)
 {
     static int motor_left_last_pulse_count = 0;
     static int motor_right_last_pulse_count = 0;
     static motor_pair_state_e last_traction_state = STOPPED;
 
-    //ESP_LOGI(TAG, "IN LOOPPPPPP!");
+    static int64_t last_execution_time = 0;
+    int64_t current_time = esp_timer_get_time();
+    int64_t time_diff = current_time - last_execution_time;
+    // if (last_execution_time != 0)
+    //{
+    //     int64_t time_diff = current_time - last_execution_time;
+    //     // ESP_LOGI(TAG, "TractionPID_Period: %lld ms", time_diff / 1000);
+    // }
+    last_execution_time = current_time;
+
+    // ESP_LOGI(TAG, "IN LOOPPPPPP!");
 
     // Calculate current speed
     int motor_left_cur_pulse_count = 0;
@@ -153,6 +165,8 @@ static void traction_pid_loop_cb(void *args)
         }
     }
 
+    float motor_right_new_speed = 0;
+    float motor_left_new_speed = 0;
     // If the vehicle is in break or coast state, its not necessary to calculate the PID value
     if (last_traction_state != BRAKE && last_traction_state != COAST)
     {
@@ -160,14 +174,11 @@ static void traction_pid_loop_cb(void *args)
         float motor_left_error = g_traction_handle->motor_left_ctx.desired_speed - motor_left_abs_pulses;
         float motor_right_error = g_traction_handle->motor_right_ctx.desired_speed - motor_right_abs_pulses;
 
-        float motor_right_new_speed = 0;
-        float motor_left_new_speed = 0;
-
         // Set the new speed
         pid_compute(g_traction_handle->motor_right_ctx.pid_ctrl, motor_right_error, &motor_right_new_speed);
         pid_compute(g_traction_handle->motor_left_ctx.pid_ctrl, motor_left_error, &motor_left_new_speed);
 
-        //printf("(%.4f, %.4f)\n", motor_left_new_speed, motor_right_new_speed);
+        // printf("(%.4f, %.4f)\n", motor_left_new_speed, motor_right_new_speed);
 
         ESP_ERROR_CHECK(bdc_motor_set_speed(g_traction_handle->motor_right_ctx.motor, (uint32_t)motor_right_new_speed));
         ESP_ERROR_CHECK(bdc_motor_set_speed(g_traction_handle->motor_left_ctx.motor, (uint32_t)motor_left_new_speed));
@@ -187,10 +198,14 @@ static void traction_pid_loop_cb(void *args)
     // Send data to the queue
     tract_ctrl_send2data_queue(&traction_data);
 
+    printf("/*%d,%d,%d,%d,%.4f,%.4f,%llu*/\n", traction_data.mleft_set_point, traction_data.mleft_pulses, traction_data.mright_set_point, traction_data.mright_pulses, motor_left_new_speed, motor_right_new_speed, time_diff / 1000);
+
     // if (xQueueSend(g_traction_data_queue, &traction_data, portMAX_DELAY) != pdPASS)
     //{
     //     ESP_LOGE(TAG, "Error sending data to queue");
     // }
+
+    return true;
 }
 
 esp_err_t tract_ctrl_send2data_queue(motor_pair_data_t *data)
@@ -201,10 +216,10 @@ esp_err_t tract_ctrl_send2data_queue(motor_pair_data_t *data)
     if (xQueueSend(g_traction_data_queue, data, pdMS_TO_TICKS(20)) != pdPASS)
     {
         // ESP_LOGE(TAG, "Error sending data to queue");
-        return ESP_FAIL;
+        // return ESP_FAIL;
     }
 
-    return ESP_OK;
+    return true;
 }
 
 esp_err_t tract_ctrl_set_direction(const motor_pair_state_e state)
@@ -290,8 +305,8 @@ esp_err_t tract_ctrl_set_speed_event_handler(float *mleft_speed_pv, float *mrigh
             tract_ctrl_set_direction(FORWARD);
         else
         {
-            printf("(%.4f, %.4f)\n", mleft_speed, mright_speed);
-            //tract_ctrl_set_direction(BRAKE);
+            // printf("(%.4f, %.4f)\n", mleft_speed, mright_speed);
+            //  tract_ctrl_set_direction(BRAKE);
         }
 
         motor_pair_set_speed((int)roundf(TRACT_CONV_REV2PULSES(mleft_abs)), (int)roundf(TRACT_CONV_REV2PULSES(mright_abs)), g_traction_handle);
@@ -390,15 +405,38 @@ static void tract_ctrl_task(void *pvParameters)
     ESP_ERROR_CHECK(motor_pair_init(&tract_ctrl_config, g_traction_handle));
 
     /* Setting up timer */
-    const esp_timer_create_args_t traction_timer_args = {
-        .callback = &traction_pid_loop_cb,
-        .arg = NULL,
-        .name = "traction_pid_loop",
-        .dispatch_method = ESP_TIMER_TASK,
+    // const esp_timer_create_args_t traction_timer_args = {
+    //     .callback = &traction_pid_loop_cb,
+    //     .arg = NULL,
+    //     .name = "traction_pid_loop",
+    //     .dispatch_method = ESP_TIMER_TASK,
+    //     .skip_unhandled_events = true,
+    // };
+
+    // ESP_ERROR_CHECK(esp_timer_create(&traction_timer_args, &g_traction_pid_timer));
+
+    // GPTimer
+    gptimer_config_t gptimer_config = {
+        .clk_src = GPTIMER_CLK_SRC_DEFAULT, // Use the default clock source
+        .direction = GPTIMER_COUNT_UP,      // Count up
+        .resolution_hz = 1000000,           // 1 MHz resolution (1 tick = 1 microsecond)
     };
 
-    ESP_ERROR_CHECK(esp_timer_create(&traction_timer_args, &g_traction_pid_timer));
+    ESP_ERROR_CHECK(gptimer_new_timer(&gptimer_config, &g_traction_pid_gptimer));
 
+    gptimer_event_callbacks_t gptimer_callbacks = {
+        .on_alarm = traction_pid_loop_cb, // Callback function
+    };
+
+    ESP_ERROR_CHECK(gptimer_register_event_callbacks(g_traction_pid_gptimer, &gptimer_callbacks, NULL));
+    gptimer_alarm_config_t alarm_config = {
+        .reload_count = 0,                            // Start counting from 0
+        .alarm_count = BDC_PID_LOOP_PERIOD_MS * 1000, // Alarm period in microseconds
+        .flags.auto_reload_on_alarm = true,           // Enable auto-reload
+    };
+
+    ESP_ERROR_CHECK(gptimer_set_alarm_action(g_traction_pid_gptimer, &alarm_config));
+    ESP_ERROR_CHECK(gptimer_enable(g_traction_pid_gptimer));
     // Enable motors
     ESP_ERROR_CHECK(motor_pair_enable_motors(g_traction_handle));
 
@@ -411,23 +449,22 @@ static void tract_ctrl_task(void *pvParameters)
         .mright_set_point = 0.0f,
     };
 
-
     // Setting up queue
     g_traction_data_queue = xQueueCreate(4, sizeof(motor_pair_data_t));
     g_traction_cmd_queue = xQueueCreate(4, sizeof(tract_ctrl_cmd_t));
 
     ESP_LOGI(TAG, "Starting motor speed loop");
-    esp_err_t ret = esp_timer_start_periodic(g_traction_pid_timer, BDC_PID_LOOP_PERIOD_MS * 1000);
+    ESP_ERROR_CHECK(gptimer_start(g_traction_pid_gptimer));
+    // esp_err_t ret = esp_timer_start_periodic(g_traction_pid_timer, BDC_PID_LOOP_PERIOD_MS * 1000);
 
     // Set initial speed
-    float initial_speed = 0.0f;
+    float initial_speed = 0.5f;
     tract_ctrl_set_speed_event_handler(&initial_speed, &initial_speed);
 
-
-    if (ret != ESP_OK)
-        ESP_LOGE(TAG, "Error starting pid loop timer");
-    else
-        ESP_LOGI(TAG, "PID loop timer started correctly");
+    // if (ret != ESP_OK)
+    //     ESP_LOGE(TAG, "Error starting pid loop timer");
+    // else
+    //     ESP_LOGI(TAG, "PID loop timer started correctly");
 
     for (;;)
     {
