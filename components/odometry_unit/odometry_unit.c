@@ -13,7 +13,7 @@
 #include "traction_control.h"
 #include "traction_task_common.h"
 
-#define IN_VECINITY(x, setpoint) (abs(setpoint - x) <= 30 ? setpoint : x)
+#define IN_VECINITY(x, setpoint) (abs(setpoint - x) <= 10 ? setpoint : x)
 
 static const char TAG[] = "odometry_task";
 
@@ -82,7 +82,7 @@ esp_err_t odometry_send_to_data_queue(odometry_data_t *data)
 
     if (xQueueSend(g_odometry_data_queue, data, pdMS_TO_TICKS(20)) != pdPASS)
     {
-        ESP_LOGE(TAG, "Error sending queue");
+        //ESP_LOGE(TAG, "Error sending queue");
     }
 
     return ESP_OK;
@@ -102,12 +102,14 @@ esp_err_t odometry_update_pose(motor_pair_data_t r_data)
     int delta_phir = r_data.mright_pulses;
 
     // Correct for angle
-    delta_phil = IN_VECINITY(delta_phil, r_data.mleft_set_point);
-    delta_phir = IN_VECINITY(delta_phir, r_data.mright_set_point);
+    //delta_phil = IN_VECINITY(delta_phil, r_data.mleft_set_point);
+    //delta_phir = IN_VECINITY(delta_phir, r_data.mright_set_point);
 
     // Update vehicle's wheel angle. Rolling average
     g_vehicle_pose.phi_l.cur_value += delta_phil;
     g_vehicle_pose.phi_r.cur_value += delta_phir;
+
+    printf("/*left,%.4f,right,%.4f*/\n", g_vehicle_pose.phi_l.cur_value, g_vehicle_pose.phi_r.cur_value);
 
     // ESP_LOGI(TAG, "IN LOOPPPPPP!");
     float phi_diff = g_vehicle_pose.phi_r.cur_value - g_vehicle_pose.phi_l.cur_value;
@@ -131,7 +133,7 @@ esp_err_t odometry_update_pose(motor_pair_data_t r_data)
     g_vehicle_pose.y.cur_value += WHEEL_RADIUS * (phi_sum / 2) * sin(g_vehicle_pose.theta.cur_value);
 
     float delta_t_seconds = delta_t / 1000000.0f;
-    odometry_calculate_differential(&g_vehicle_pose, delta_t_seconds);
+    odometry_calculate_differential(&g_vehicle_pose, 10E-3);
 
     odometry_data_t data = g_vehicle_pose;
     odometry_send_to_data_queue(&data);

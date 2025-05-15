@@ -236,15 +236,15 @@ void diff_drive_receive_kalman_data(void)
     if (xQueueReceive(g_kalman_data_queue, &vehicle_pose, pdMS_TO_TICKS(5)) == pdPASS)
     {
         // printf("kalman received in diff_drive\n");
-        if (counter % 100 == 0)
-        {
-            counter = 0;
+        //if (counter % 100 == 0)
+        //{
+            //counter = 0;
 #if false 
-            printf("/*x,%f,xd,%f,y,%f,yd,%f,theta,%f,thetad,%f,state,%d*/\r\n", vehicle_pose.x, g_current_point.x, vehicle_pose.y, g_current_point.y, vehicle_pose.theta, g_current_point.theta, g_diff_drive_state);
+            printf("/*x,%f,xd,%f,y,%f,yd,%f,theta,%f,thetad,%f,state,%d*/\n", vehicle_pose.x, g_current_point.x, vehicle_pose.y, g_current_point.y, vehicle_pose.theta, g_current_point.theta, g_diff_drive_state);
 #endif
-        }
+        // }
 
-        counter++;
+        // counter++;
 
         if (g_diff_drive_state != DD_STATE_POINT_REACHED)
             ESP_ERROR_CHECK(diff_drive_point_follower(&vehicle_pose));

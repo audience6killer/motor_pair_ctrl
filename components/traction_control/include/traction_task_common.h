@@ -28,13 +28,21 @@
 #define MOTOR1_ENCODER_RES                  908
 #define MOTOR2_ENCODER_RES                  908
 
-#define TRACT_ML_KP                         0.001f
-#define TRACT_ML_KI                         0.009f
-#define TRACT_ML_KD                         0.20f
+#define TRACT_ML_KP                         0.50f
+#define TRACT_ML_KI                         0.10f
+#define TRACT_ML_KD                         0.50f
 
-#define TRACT_MR_KP                         0.10f
+#define TRACT_MR_KP                         0.50f
 #define TRACT_MR_KI                         0.10f
-#define TRACT_MR_KD                         0.20f
+#define TRACT_MR_KD                         0.50f
+
+// #define MOTOR_LEFT_KP                       1.00f
+// #define MOTOR_LEFT_KI                       0.54f
+// #define MOTOR_LEFT_KD                       0.7f
+// 
+// #define MOTOR_RIGHT_KP                      0.70f
+// #define MOTOR_RIGHT_KI                      0.30f
+// #define MOTOR_RIGHT_KD                      0.20f
 
 /* Originales */
 //#define TRACT_ML_KP                         0.65f
@@ -52,9 +60,9 @@
 #define TRACT_MOTOR_MAX_PULSES           550
 #define TRACT_MOTOR_MAX_REVS             2.718f
 
-// Fix loosy conversions 
+// Fix loosy conversions
 #define TRACT_PULSES_PER_REV_10MS        204.0f 
-#define TRACITON_TOTAL_PULSES_PER_REV       TRACT_PULSES_PER_REV_10MS * 100.0f 
+#define TRACITON_TOTAL_PULSES_PER_REV    TRACT_PULSES_PER_REV_10MS * 10.0f 
 
 #define TRACT_PULSES2REV_FACTOR          1/TRACT_PULSES_PER_REV_10MS
 

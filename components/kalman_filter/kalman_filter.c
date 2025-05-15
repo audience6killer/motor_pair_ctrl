@@ -55,6 +55,9 @@ esp_err_t kalman_send2queue(kalman_info_t *data)
 
     ESP_RETURN_ON_FALSE(data != NULL, ESP_ERR_INVALID_STATE, TAG, "Null data to send to queue");
 
+    //printf("/*x,%.4f,y,%.4f,z,%.4f,theta,%.4f*/\n",
+    //         data->x, data->y, data->z, data->theta);
+
     if (xQueueSend(g_kalman_data_queue, data, portMAX_DELAY) != pdPASS)
     {
         ESP_LOGE(TAG, "Error sending queue");
