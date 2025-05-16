@@ -280,8 +280,8 @@ esp_err_t tract_ctrl_stop_event_handler(void)
 
     float zero_speed = 0.0f;
     tract_ctrl_set_speed_event_handler(&zero_speed, &zero_speed);
-    ESP_ERROR_CHECK(bdc_motor_brake(g_traction_handle->motor_left_ctx.motor));
-    ESP_ERROR_CHECK(bdc_motor_brake(g_traction_handle->motor_right_ctx.motor));
+    ESP_ERROR_CHECK(bdc_motor_coast(g_traction_handle->motor_left_ctx.motor));
+    ESP_ERROR_CHECK(bdc_motor_coast(g_traction_handle->motor_right_ctx.motor));
     pid_reset_ctrl_block(g_traction_handle->motor_left_ctx.pid_ctrl);
     pid_reset_ctrl_block(g_traction_handle->motor_right_ctx.pid_ctrl);
 

@@ -55,8 +55,8 @@ esp_err_t kalman_send2queue(kalman_info_t *data)
 
     ESP_RETURN_ON_FALSE(data != NULL, ESP_ERR_INVALID_STATE, TAG, "Null data to send to queue");
 
-    //printf("/*x,%.4f,y,%.4f,z,%.4f,theta,%.4f*/\n",
-    //         data->x, data->y, data->z, data->theta);
+    printf("/*x,%.4f,y,%.4f,z,%.4f,theta,%.4f*/\n",
+           data->x, data->y, data->z, data->theta);
 
     if (xQueueSend(g_kalman_data_queue, data, portMAX_DELAY) != pdPASS)
     {
@@ -111,7 +111,7 @@ esp_err_t kalman_start_event_handler(void)
     }
 
     odometry_cmd_e cmd_odo = ODO_CMD_START;
-    if(xQueueSend(g_odometry_cmd_queue, &cmd_odo, pdMS_TO_TICKS(100)) != pdPASS)
+    if (xQueueSend(g_odometry_cmd_queue, &cmd_odo, pdMS_TO_TICKS(100)) != pdPASS)
     {
         ESP_LOGE(TAG, "Error: Sending start cmd to odometry");
         return ESP_FAIL;
@@ -132,7 +132,7 @@ esp_err_t kalman_stop_event_handler(void)
 
     /* Stop sources process*/
     odometry_cmd_e cmd_odo = ODO_CMD_STOP;
-    if(xQueueSend(g_odometry_cmd_queue, &cmd_odo, pdMS_TO_TICKS(100)) != pdPASS)
+    if (xQueueSend(g_odometry_cmd_queue, &cmd_odo, pdMS_TO_TICKS(100)) != pdPASS)
     {
         ESP_LOGE(TAG, "Error: Sending stop cmd to odometry");
         return ESP_FAIL;

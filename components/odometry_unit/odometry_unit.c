@@ -109,7 +109,7 @@ esp_err_t odometry_update_pose(motor_pair_data_t r_data)
     g_vehicle_pose.phi_l.cur_value += delta_phil;
     g_vehicle_pose.phi_r.cur_value += delta_phir;
 
-    printf("/*left,%.4f,right,%.4f*/\n", g_vehicle_pose.phi_l.cur_value, g_vehicle_pose.phi_r.cur_value);
+    //printf("/*left,%.4f,right,%.4f*/\n", g_vehicle_pose.phi_l.cur_value, g_vehicle_pose.phi_r.cur_value);
 
     // ESP_LOGI(TAG, "IN LOOPPPPPP!");
     float phi_diff = g_vehicle_pose.phi_r.cur_value - g_vehicle_pose.phi_l.cur_value;

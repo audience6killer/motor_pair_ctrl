@@ -18,11 +18,12 @@ typedef enum {
     RECEIVING
 } data_center_reception_e;
 
+/*
 typedef struct {
     state_machine_cmd_e code;
     float args[3];
 } data_center_msg_t;
-
+*/
  // Task state
 typedef enum {
     INIT = 0,

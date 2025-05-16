@@ -153,6 +153,7 @@ esp_err_t diff_drive_point_follower(kalman_info_t *c_pose)
     }
     else if (fabs(ori_e) >= ORIENTATION_TH)
     {
+        g_diff_drive_state = DD_STATE_ORIENTING;
         ESP_ERROR_CHECK(diff_drive_orientation_control(ori_e));
     }
     else
@@ -160,9 +161,9 @@ esp_err_t diff_drive_point_follower(kalman_info_t *c_pose)
         ESP_LOGI(TAG, "Vehicle reached point: (%f, %f, theta:%f)\n", g_current_point.x, g_current_point.y, g_current_point.theta);
         float speed = 0.0f;
         ESP_ERROR_CHECK(diff_drive_send2traction((tract_ctrl_cmd_t){
-            .cmd = TRACT_CTRL_CMD_SET_SPEED,
-            .motor_left_speed = &speed,
-            .motor_right_speed = &speed,
+            .cmd = TRACT_CTRL_CMD_STOP,
+            .motor_left_speed = NULL,
+            .motor_right_speed = NULL,
         }));
 
         diff_drive_update_state(DD_STATE_POINT_REACHED);
