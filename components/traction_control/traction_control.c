@@ -70,7 +70,7 @@ esp_err_t tract_ctrl_get_cmd_queue(QueueHandle_t *queue)
 
 static bool IRAM_ATTR traction_pid_isr_cb(gptimer_handle_t timer, const gptimer_alarm_event_data_t *event_data, void *user_ctx)
 {
-    //printf("In loop");
+    // printf("In loop");
     static int motor_left_last_pulse_count = 0;
     static int motor_right_last_pulse_count = 0;
 
@@ -253,8 +253,8 @@ esp_err_t tract_ctrl_send2data_queue(motor_pair_data_t *data)
 
     if (xQueueSend(g_traction_data_queue, data, pdMS_TO_TICKS(10)) != pdPASS)
     {
-        //ESP_LOGE(TAG, "Error sending data to queue");
-        //return ESP_FAIL;
+        // ESP_LOGE(TAG, "Error sending data to queue");
+        // return ESP_FAIL;
     }
 
     return ESP_OK;
@@ -305,10 +305,10 @@ esp_err_t tract_ctrl_start_event_handler(void)
     // }
     // esp_err_t ret = esp_timer_start_periodic(g_traction_pid_timer, BDC_PID_LOOP_PERIOD_MS * 1000);
 
-    //if (ret != ESP_OK)
-    //    ESP_LOGE(TAG, "Error starting pid loop timer");
-    //else
-        ESP_LOGI(TAG, "PID loop timer started correctly");
+    // if (ret != ESP_OK)
+    //     ESP_LOGE(TAG, "Error starting pid loop timer");
+    // else
+    ESP_LOGI(TAG, "PID loop timer started correctly");
 
     return ESP_OK;
 }
@@ -318,11 +318,11 @@ esp_err_t tract_ctrl_set_speed_event_handler(float *mleft_speed_pv, float *mrigh
     ESP_RETURN_ON_FALSE(mleft_speed_pv != NULL, ESP_ERR_INVALID_ARG, TAG, "mleft_speed is NULL");
     ESP_RETURN_ON_FALSE(mright_speed_pv != NULL, ESP_ERR_INVALID_ARG, TAG, "mright_speed is NULL");
 
-    //if (!esp_timer_is_active(g_traction_pid_timer))
+    // if (!esp_timer_is_active(g_traction_pid_timer))
     //{
-    //    ESP_LOGE(TAG, "PID loop is not running");
-    //    return ESP_FAIL;
-    //}
+    //     ESP_LOGE(TAG, "PID loop is not running");
+    //     return ESP_FAIL;
+    // }
 
     float mleft_speed = *mleft_speed_pv;
     float mright_speed = *mright_speed_pv;
@@ -344,10 +344,13 @@ esp_err_t tract_ctrl_set_speed_event_handler(float *mleft_speed_pv, float *mrigh
         else
         {
             // printf("(%.4f, %.4f)\n", mleft_speed, mright_speed);
-            //  tract_ctrl_set_direction(BRAKE);
+            //   tract_ctrl_set_direction(BRAKE);
         }
-
-        motor_pair_set_speed((int)roundf(TRACT_CONV_REV2PULSES(mleft_abs)), (int)roundf(TRACT_CONV_REV2PULSES(mright_abs)), g_traction_handle);
+        int mleft_int = roundf(TRACT_CONV_REV2PULSES(mleft_abs));
+        int mright_int = roundf(TRACT_CONV_REV2PULSES(mright_abs));
+        // printf("m_lefta, %f, m_righta, %f, left_int:%d, right_int:%d   ", mleft_abs, mright_abs, mleft_int, mright_int);
+        if(mleft_int > 0 && mright_int > 0)
+            motor_pair_set_speed(mleft_int, mright_int, g_traction_handle);
     }
     else
     {
@@ -615,8 +618,7 @@ static void tract_speed_update_task(void *pvParameters)
             // Send data to the queue
             tract_ctrl_send2data_queue(&traction_data);
 
-            //printf("/*%d,%d,%d,%d,%.4f,%.4f,%llu*/\n", traction_data.mleft_set_point, traction_data.mleft_pulses, traction_data.mright_set_point, traction_data.mright_pulses, motor_left_new_speed, motor_right_new_speed, time_diff / 1000);
-
+            // printf("/*%d,%d,%d,%d,%.4f,%.4f,%llu*/\n", traction_data.mleft_set_point, traction_data.mleft_pulses, traction_data.mright_set_point, traction_data.mright_pulses, motor_left_new_speed, motor_right_new_speed, time_diff / 1000);
         }
     }
 }

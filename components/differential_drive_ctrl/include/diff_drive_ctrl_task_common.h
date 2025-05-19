@@ -7,14 +7,19 @@
 #define DIFF_DRIVE_TASK_PRIORITY       20 
 
 /* Originales */
-// #define DIFF_DRIVE_POS_KP              0.8f
-// #define DIFF_DRIVE_POS_KD              0.2f
+#define DIFF_DRIVE_POS_KP               0.9f
+#define DIFF_DRIVE_POS_KI               0.1f
+#define DIFF_DRIVE_POS_KD               0.5f
 
-#define DIFF_DRIVE_POS_KP              0.8f
-#define DIFF_DRIVE_POS_KD              1.2f
-
-#define DIFF_DRIVE_ORI_KP              0.8f
-#define DIFF_DRIVE_ORI_KD              0.2f
+#define DIFF_DRIVE_ORI_KP               0.9f
+#define DIFF_DRIVE_ORI_KD               0.1f
+#define DIFF_DRIVE_ORI_KI               0.5f 
+/* Funcionales */
+//#define DIFF_DRIVE_POS_KP              0.8f
+//#define DIFF_DRIVE_POS_KD              1.2f
+//
+//#define DIFF_DRIVE_ORI_KP              0.8f
+//#define DIFF_DRIVE_ORI_KD              1.2f
 
 // Velocidad lineal de crucero = 0.5m/s = 0.388rev/s = 2.437rad/s
 #define V_COMM                         2.437f 
@@ -24,9 +29,11 @@
 #define V_MAX_RADS                     2.925f   
 // #define V_MAX_RADS                     0.2f   
 #define WHEEL_RADIUS                   0.2046f
-#define DISTANCE_TH                    0.08f        // 5 cm
+#define DISTANCE_TH                    0.20f        // 20 cm
 
-#define ORIENTATION_TH                 0.087266 // 5°
+#define ORIENTATION_TH                 0.08726646 // 5°
 #define RADS2REVS(b) (b * 0.1592f)
+
+/*x,20.0239,y,-0.0621,z,0.0000,theta,-0.0068*/
 
 #endif

@@ -44,71 +44,6 @@ static navigation_point_t g_current_point;
 /* Function declarations */
 esp_err_t diff_drive_send2traction(tract_ctrl_cmd_t cmd);
 
-esp_err_t diff_drive_orientation_control(float theta_error)
-{
-    ESP_RETURN_ON_FALSE(diff_drive_handle != NULL, ESP_ERR_INVALID_STATE, "TAG", "diff_drive_handle is null when calculating pos control");
-
-    float wheel_angular_vel = 0.0f; // rad/s
-    ESP_ERROR_CHECK(pid_compute(diff_drive_handle->orientation_pid_ctrl, theta_error, &wheel_angular_vel));
-
-    // The lines below will be necessary if the linear velocity would be used,
-    // but the traction module just accepts angular velocity
-    // float phi_lp = (-1.00f) * wheel_angular_vel / WHEEL_RADIUS; // m/s
-    // float phi_rp = wheel_angular_vel / WHEEL_RADIUS;
-
-    // Ensure that the velocity is within the limits
-    float phi_p = MIN(MAX(wheel_angular_vel, -V_MAX_RADS), V_MAX_RADS);
-
-    float left_speed = (float)RADS2REVS((-1.0f) * phi_p);
-    float right_speed = (float)RADS2REVS(phi_p);
-    //printf("phi_lpo: %f, phi_rpo: %f\n", phi_p, phi_p);
-    tract_ctrl_cmd_t cmd = {
-        .cmd = TRACT_CTRL_CMD_SET_SPEED,
-        .motor_left_speed = &left_speed,
-        .motor_right_speed = &right_speed,
-    };
-
-    ESP_ERROR_CHECK_WITHOUT_ABORT(diff_drive_send2traction(cmd));
-
-    return ESP_OK;
-}
-
-esp_err_t diff_drive_position_control(float theta_error)
-{
-    ESP_RETURN_ON_FALSE(diff_drive_handle != NULL, ESP_ERR_INVALID_STATE, "TAG", "diff_drive_handle is null when calculating pos control");
-
-    float wheel_angular_vel = 0.0f;
-
-    ESP_ERROR_CHECK(pid_compute(diff_drive_handle->position_pid_ctrl, theta_error, &wheel_angular_vel));
-
-    // float phi_lp = V_COMM - (wheel_angular_vel / WHEEL_RADIUS);
-    // float phi_rp = V_COMM + (wheel_angular_vel / WHEEL_RADIUS);
-    float phi_lp = V_COMM - wheel_angular_vel;
-    float phi_rp = V_COMM + wheel_angular_vel;
-
-    phi_lp = MIN(MAX(phi_lp, -V_MAX_RADS), V_MAX_RADS);
-    phi_rp = MIN(MAX(phi_rp, -V_MAX_RADS), V_MAX_RADS);
-
-    // printf("wheel_angular_vel,%f\r\n", wheel_angular_vel);
-    // printf("phi_lp: %f, phi_rp: %f\n", phi_lp, phi_rp);
-
-    float left_speed = (float)RADS2REVS(phi_lp);
-    float right_speed = (float)RADS2REVS(phi_rp);
-
-    // printf("phi_lpp: %f, phi_rpp: %f\n", left_speed, right_speed);
-
-    tract_ctrl_cmd_t cmd = {
-        .cmd = TRACT_CTRL_CMD_SET_SPEED,
-        .motor_left_speed = &left_speed,
-        .motor_right_speed = &right_speed,
-    };
-
-    ESP_ERROR_CHECK_WITHOUT_ABORT(diff_drive_send2traction(cmd));
-    // ESP_ERROR_CHECK(traction_control_speed_controlled_direction(phi_lp, phi_rp));
-
-    return ESP_OK;
-}
-
 esp_err_t diff_drive_update_state(diff_drive_state_e state)
 {
     ESP_RETURN_ON_FALSE(g_diff_drive_state_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "trying to send msg to queue before init");
@@ -125,6 +60,69 @@ esp_err_t diff_drive_update_state(diff_drive_state_e state)
     return ESP_OK;
 }
 
+
+esp_err_t diff_drive_orientation_control(float theta_error)
+{
+    ESP_RETURN_ON_FALSE(diff_drive_handle != NULL, ESP_ERR_INVALID_STATE, "TAG", "diff_drive_handle is null when calculating pos control");
+
+    float wheel_angular_vel = 0.0f; // rad/s
+    ESP_ERROR_CHECK(pid_compute(diff_drive_handle->orientation_pid_ctrl, theta_error, &wheel_angular_vel));
+    printf("ORIENTATION CONTROL  ");
+
+    // The lines below will be necessary if the linear velocity would be used,
+    // but the traction module only accepts angular velocity
+    // float phi_lp = (-1.00f) * wheel_angular_vel / WHEEL_RADIUS; // m/s
+    // float phi_rp = wheel_angular_vel / WHEEL_RADIUS;
+
+    // Ensure that the velocity is within the limits
+    float phi_p = MIN(MAX(wheel_angular_vel, -V_MAX_RADS), V_MAX_RADS);
+
+    float left_speed = (float)RADS2REVS((-1.0f) * phi_p);
+    float right_speed = (float)RADS2REVS(phi_p);
+    // printf("phi_lpo: %f, phi_rpo: %f\n", phi_p, phi_p);
+    tract_ctrl_cmd_t cmd = {
+        .cmd = TRACT_CTRL_CMD_SET_SPEED,
+        .motor_left_speed = &left_speed,
+        .motor_right_speed = &right_speed,
+    };
+
+    ESP_ERROR_CHECK_WITHOUT_ABORT(diff_drive_send2traction(cmd));
+
+    return ESP_OK;
+}
+
+esp_err_t diff_drive_position_control(float theta_error)
+{
+    ESP_RETURN_ON_FALSE(diff_drive_handle != NULL, ESP_ERR_INVALID_STATE, "TAG", "diff_drive_handle is null when calculating pos control");
+
+    printf("POSITION CONTROL  ");
+    float wheel_angular_vel = 0.0f;
+
+    ESP_ERROR_CHECK(pid_compute(diff_drive_handle->position_pid_ctrl, theta_error, &wheel_angular_vel));
+
+    float phi_lp = V_COMM - wheel_angular_vel;
+    float phi_rp = V_COMM + wheel_angular_vel;
+
+    // Check for angular velocity saturation
+    phi_lp = MIN(MAX(phi_lp, -V_MAX_RADS), V_MAX_RADS);
+    phi_rp = MIN(MAX(phi_rp, -V_MAX_RADS), V_MAX_RADS);
+
+    float left_speed = (float)RADS2REVS(phi_lp);
+    float right_speed = (float)RADS2REVS(phi_rp);
+
+    // printf("phi_lp: %f, phi_rp: %f, phi_lpp: %f, phi_rpp: %f\n", phi_lp, phi_rp, left_speed, right_speed);
+
+    tract_ctrl_cmd_t cmd = {
+        .cmd = TRACT_CTRL_CMD_SET_SPEED,
+        .motor_left_speed = &left_speed,
+        .motor_right_speed = &right_speed,
+    };
+
+    ESP_ERROR_CHECK_WITHOUT_ABORT(diff_drive_send2traction(cmd));
+
+    return ESP_OK;
+}
+
 esp_err_t diff_drive_point_follower(kalman_info_t *c_pose)
 {
     g_diff_drive_error.err_y = g_current_point.y - c_pose->y;
@@ -133,25 +131,32 @@ esp_err_t diff_drive_point_follower(kalman_info_t *c_pose)
     float y_error = g_diff_drive_error.err_y;
     float x_error = g_diff_drive_error.err_x;
 
+    // theta_m is the angle between the current position and the desired position
     float theta_m = atan2f(y_error, x_error);
     g_diff_drive_error.err_theta = theta_m - c_pose->theta;
 
     float theta_error = g_diff_drive_error.err_theta;
 
     g_diff_drive_error.err_dist = sqrtf(powf(x_error, 2) + powf(y_error, 2));
+    // Err_ori is the error between the desired final orientation and the current orientation
     g_diff_drive_error.err_ori = g_current_point.theta - c_pose->theta;
 
     float dist_error = g_diff_drive_error.err_dist;
     float ori_e = g_diff_drive_error.err_ori;
 
     // printf("theta_error:%f,d_error:%f,ori_e:%f*/\r\n", theta_error, dist_error, ori_e);
+    // printf("%.4f\n", dist_error);
 
-    if (dist_error > DISTANCE_TH)
+    #if true
+        printf("/*x,%.4f,xd,%.4f,y,%.4f,yd,%.4f,theta,%.4f,thetad,%.4f,dist_error,%.4f,ori_error,%.4f*/\n",c_pose->x, g_current_point.x, c_pose->y, g_current_point.y, c_pose->theta, g_current_point.theta, dist_error, ori_e);
+    #endif
+
+    if (dist_error >= DISTANCE_TH)
     {
         g_diff_drive_state = DD_STATE_NAVIGATING;
         ESP_ERROR_CHECK(diff_drive_position_control(theta_error));
     }
-    else if (fabs(ori_e) >= ORIENTATION_TH)
+    else if (fabs(ori_e) > ORIENTATION_TH)
     {
         g_diff_drive_state = DD_STATE_ORIENTING;
         ESP_ERROR_CHECK(diff_drive_orientation_control(ori_e));
@@ -159,7 +164,6 @@ esp_err_t diff_drive_point_follower(kalman_info_t *c_pose)
     else
     {
         ESP_LOGI(TAG, "Vehicle reached point: (%f, %f, theta:%f)\n", g_current_point.x, g_current_point.y, g_current_point.theta);
-        float speed = 0.0f;
         ESP_ERROR_CHECK(diff_drive_send2traction((tract_ctrl_cmd_t){
             .cmd = TRACT_CTRL_CMD_STOP,
             .motor_left_speed = NULL,
@@ -237,9 +241,9 @@ void diff_drive_receive_kalman_data(void)
     if (xQueueReceive(g_kalman_data_queue, &vehicle_pose, pdMS_TO_TICKS(5)) == pdPASS)
     {
         // printf("kalman received in diff_drive\n");
-        //if (counter % 100 == 0)
+        // if (counter % 100 == 0)
         //{
-            //counter = 0;
+        // counter = 0;
 #if false 
             printf("/*x,%f,xd,%f,y,%f,yd,%f,theta,%f,thetad,%f,state,%d*/\n", vehicle_pose.x, g_current_point.x, vehicle_pose.y, g_current_point.y, vehicle_pose.theta, g_current_point.theta, g_diff_drive_state);
 #endif
@@ -342,22 +346,21 @@ esp_err_t diff_drive_ctrl_init(void)
     pid_ctrl_parameter_t diff_drive_pos_pid_runtime_param = {
         .kp = DIFF_DRIVE_POS_KP,
         .kd = DIFF_DRIVE_POS_KD,
-        .ki = 0.1,
+        .ki = DIFF_DRIVE_POS_KI,
         .cal_type = PID_CAL_TYPE_POSITIONAL,
-        .max_integral = 10,
-        .min_integral = -10,
-        .min_output = -200,
+        .max_integral = 1000,
+        .min_integral = -1000,
+        .max_output = 100,
+        .min_output = -100,
     };
 
     pid_ctrl_parameter_t diff_drive_ori_pid_runtime_param = {
         .kp = DIFF_DRIVE_ORI_KP,
         .kd = DIFF_DRIVE_ORI_KD,
-        .ki = 0.1,
+        .ki = 0.0f,
         .cal_type = PID_CAL_TYPE_POSITIONAL,
-        .max_integral = 10,
-        .min_integral = -10,
-        .min_output = -12,
-        .max_output = 12,
+        .max_integral = 100,
+        .min_integral = -100,
     };
 
     pid_ctrl_block_handle_t diff_drive_pos_pid_ctrl = NULL;
