@@ -167,6 +167,11 @@ esp_err_t waypoint_start_event_handler(void)
 
     /* Send first point */
     navigation_point_t point = g_navigation_points.front();
+    navigation_point_t point2 = (navigation_point_t){
+        .x = g_navigation_points.front().x,
+        .y = g_navigation_points.front().y,
+        .theta = g_navigation_points.front().theta,
+    };
     g_navigation_points.pop();
 
     diff_drive_cmd_t point_cmd = {

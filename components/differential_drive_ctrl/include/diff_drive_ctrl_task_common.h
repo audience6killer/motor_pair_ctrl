@@ -11,15 +11,19 @@
 #define DIFF_DRIVE_POS_KI               0.1f
 #define DIFF_DRIVE_POS_KD               0.5f
 
-#define DIFF_DRIVE_ORI_KP               0.9f
-#define DIFF_DRIVE_ORI_KD               0.1f
-#define DIFF_DRIVE_ORI_KI               0.5f 
-/* Funcionales */
-//#define DIFF_DRIVE_POS_KP              0.8f
-//#define DIFF_DRIVE_POS_KD              1.2f
-//
-//#define DIFF_DRIVE_ORI_KP              0.8f
-//#define DIFF_DRIVE_ORI_KD              1.2f
+#define DIFF_DRIVE_ORI_KP               8.9f
+#define DIFF_DRIVE_ORI_KI               2.0f
+#define DIFF_DRIVE_ORI_KD               0.5f
+
+/* Mejores */
+// #define DIFF_DRIVE_ORI_KP               0.1f
+// #define DIFF_DRIVE_ORI_KD               0.5f
+// #define DIFF_DRIVE_ORI_KI               0.02f
+
+// #define DIFF_DRIVE_ORI_KP               0.05f
+// #define DIFF_DRIVE_ORI_KD               0.9f
+// #define DIFF_DRIVE_ORI_KI               0.002f
+/* Mejores */
 
 // Velocidad lineal de crucero = 0.5m/s = 0.388rev/s = 2.437rad/s
 #define V_COMM                         2.437f 

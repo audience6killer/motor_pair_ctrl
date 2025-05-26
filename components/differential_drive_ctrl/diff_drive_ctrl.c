@@ -41,6 +41,9 @@ static diff_drive_state_e g_diff_drive_state;
 static diff_drive_err_t g_diff_drive_error;
 static navigation_point_t g_current_point;
 
+/* Only to debug */
+static bool g_is_oriented = false;
+
 /* Function declarations */
 esp_err_t diff_drive_send2traction(tract_ctrl_cmd_t cmd);
 
@@ -60,7 +63,6 @@ esp_err_t diff_drive_update_state(diff_drive_state_e state)
     return ESP_OK;
 }
 
-
 esp_err_t diff_drive_orientation_control(float theta_error)
 {
     ESP_RETURN_ON_FALSE(diff_drive_handle != NULL, ESP_ERR_INVALID_STATE, "TAG", "diff_drive_handle is null when calculating pos control");
@@ -79,6 +81,7 @@ esp_err_t diff_drive_orientation_control(float theta_error)
 
     float left_speed = (float)RADS2REVS((-1.0f) * phi_p);
     float right_speed = (float)RADS2REVS(phi_p);
+    // printf("phi: %.4f\n", wheel_angular_vel);
     // printf("phi_lpo: %f, phi_rpo: %f\n", phi_p, phi_p);
     tract_ctrl_cmd_t cmd = {
         .cmd = TRACT_CTRL_CMD_SET_SPEED,
@@ -147,19 +150,29 @@ esp_err_t diff_drive_point_follower(kalman_info_t *c_pose)
     // printf("theta_error:%f,d_error:%f,ori_e:%f*/\r\n", theta_error, dist_error, ori_e);
     // printf("%.4f\n", dist_error);
 
-    #if true
-        printf("/*x,%.4f,xd,%.4f,y,%.4f,yd,%.4f,theta,%.4f,thetad,%.4f,dist_error,%.4f,ori_error,%.4f*/\n",c_pose->x, g_current_point.x, c_pose->y, g_current_point.y, c_pose->theta, g_current_point.theta, dist_error, ori_e);
-    #endif
+#if true
+    printf("/*x,%.4f,xd,%.4f,y,%.4f,yd,%.4f,theta,%.4f,thetad,%.4f,dist_error,%.4f,theta_err,%.4f,ori_error,%.4f*/\n", c_pose->x, g_current_point.x, c_pose->y, g_current_point.y, c_pose->theta, g_current_point.theta, dist_error, theta_error, ori_e);
+#endif
 
     if (dist_error >= DISTANCE_TH)
     {
         g_diff_drive_state = DD_STATE_NAVIGATING;
-        ESP_ERROR_CHECK(diff_drive_position_control(theta_error));
+        // ESP_ERROR_CHECK(diff_drive_position_control(theta_error));
+        if (theta_error > ORIENTATION_TH && !g_is_oriented)
+        {
+            ESP_ERROR_CHECK(diff_drive_orientation_control(theta_error));
+        }
+        else
+        {
+            g_is_oriented = true;
+            ESP_ERROR_CHECK(diff_drive_position_control(theta_error));
+        }
     }
     else if (fabs(ori_e) > ORIENTATION_TH)
     {
         g_diff_drive_state = DD_STATE_ORIENTING;
         ESP_ERROR_CHECK(diff_drive_orientation_control(ori_e));
+        //ESP_ERROR_CHECK(pid_reset_ctrl_block(diff_drive_handle->position_pid_ctrl));
     }
     else
     {
@@ -171,6 +184,8 @@ esp_err_t diff_drive_point_follower(kalman_info_t *c_pose)
         }));
 
         diff_drive_update_state(DD_STATE_POINT_REACHED);
+        ESP_ERROR_CHECK(pid_reset_ctrl_block(diff_drive_handle->orientation_pid_ctrl));
+        ESP_ERROR_CHECK(pid_reset_ctrl_block(diff_drive_handle->position_pid_ctrl));
     }
 
     return ESP_OK;
@@ -181,13 +196,14 @@ esp_err_t diff_drive_set_navigation_point(navigation_point_t point)
     // printf("STATE: %d\n", g_diff_drive_state);
     ESP_RETURN_ON_FALSE(g_diff_drive_state == DD_STATE_POINT_REACHED || g_diff_drive_state == DD_STATE_STARTED, ESP_ERR_INVALID_STATE, TAG, "Trying to change nav point before trajectory is compleated");
 
-    ESP_LOGI(TAG, "New desired pose: (%.4f, %.4f, %.2f)\r\n", point.x, point.y, point.theta);
+    ESP_LOGI(TAG, "New desired pose: (%.4f, %.4f, %.4f)\r\n", point.x, point.y, point.theta);
 
     g_current_point = point;
+    g_is_oriented = false;
 
-    if (g_diff_drive_state != DD_STATE_ORIENTING)
+    if (g_diff_drive_state != DD_STATE_NAVIGATING)
     {
-        diff_drive_update_state(DD_STATE_ORIENTING);
+        diff_drive_update_state(DD_STATE_NAVIGATING);
     }
 
     return ESP_OK;
@@ -290,16 +306,19 @@ esp_err_t diff_drive_stop_event_handle(void)
         .motor_left_speed = NULL,
         .motor_right_speed = NULL,
     }));
+
+    // ESP_ERROR_CHECK(pid_reset_ctrl_block(diff_drive_handle->orientation_pid_ctrl));
+    // ESP_ERROR_CHECK(pid_reset_ctrl_block(diff_drive_handle->position_pid_ctrl));
     ESP_LOGW(TAG, "Process Stopped");
 
     return ESP_OK;
 }
 
-esp_err_t diff_drive_receive_point_event_handler(navigation_point_t *point)
+esp_err_t diff_drive_receive_point_event_handler(navigation_point_t point)
 {
-    ESP_RETURN_ON_FALSE(point != NULL, ESP_ERR_INVALID_STATE, TAG, "Navigation point is null");
+    //ESP_RETURN_ON_FALSE(point != NULL, ESP_ERR_INVALID_STATE, TAG, "Navigation point is null");
 
-    esp_err_t ret = diff_drive_set_navigation_point(*point);
+    esp_err_t ret = diff_drive_set_navigation_point(point);
     if (ret != ESP_OK)
     {
         ESP_LOGE(TAG, "Error setting navigation point. Code: %s", esp_err_to_name(ret));
@@ -311,7 +330,7 @@ esp_err_t diff_drive_receive_point_event_handler(navigation_point_t *point)
 
 void diff_drive_cmd_handler(void)
 {
-    static diff_drive_cmd_t cmd;
+    diff_drive_cmd_t cmd;
     if (xQueueReceive(g_diff_drive_cmd_queue, &cmd, pdMS_TO_TICKS(10)))
     {
         switch (cmd.cmd)
@@ -328,7 +347,17 @@ void diff_drive_cmd_handler(void)
 
         case DD_CMD_RECEIVE_POINT:
             ESP_LOGI(TAG, "Event: Point received");
-            diff_drive_receive_point_event_handler(cmd.point);
+            if (cmd.point != NULL)
+            {
+                printf("Received navigation point: x=%.4f, y=%.4f, theta=%.4f\n", cmd.point->x, cmd.point->y, cmd.point->theta);
+                navigation_point_t point = *cmd.point;
+                diff_drive_receive_point_event_handler(point);
+            }
+            else 
+            {
+                ESP_LOGE(TAG, "Event Error: Point received was NULL");
+                break;
+            }
             break;
 
         default:
@@ -357,10 +386,12 @@ esp_err_t diff_drive_ctrl_init(void)
     pid_ctrl_parameter_t diff_drive_ori_pid_runtime_param = {
         .kp = DIFF_DRIVE_ORI_KP,
         .kd = DIFF_DRIVE_ORI_KD,
-        .ki = 0.0f,
+        .ki = DIFF_DRIVE_ORI_KI,
         .cal_type = PID_CAL_TYPE_POSITIONAL,
-        .max_integral = 100,
-        .min_integral = -100,
+        .max_integral = 1000,
+        .min_integral = -1000,
+        .max_output = 100,
+        .min_output = -100,
     };
 
     pid_ctrl_block_handle_t diff_drive_pos_pid_ctrl = NULL;
@@ -392,7 +423,7 @@ static void diff_drive_ctrl_task(void *pvParameters)
 
     /* Initialize queues */
     g_diff_drive_state_queue = xQueueCreate(4, sizeof(diff_drive_state_e));
-    g_diff_drive_cmd_queue = xQueueCreate(4, sizeof(diff_drive_cmd_t));
+    g_diff_drive_cmd_queue = xQueueCreate(5, sizeof(diff_drive_cmd_t));
 
     ESP_ERROR_CHECK(diff_drive_ctrl_init());
 
