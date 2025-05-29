@@ -61,6 +61,46 @@ esp_err_t data_center_send_vehicle_data(char *msg)
     return ESP_OK;
 }
 
+/* Colect data while */
+void data_center_recolect_data(char *msg)
+{
+    // Clear the json document 
+    json.clear();
+
+    /* Get waypoint data */ 
+    json["wp"]["st"] = waypoint_get_state_string();
+    json["wp"]["no_p"] = waypoint_get_point_number();
+    
+    /* Get diff drive data */
+    json["dd"]["st"] = diff_drive_get_state_string();
+    navigation_point_t current_point;
+    diff_drive_get_current_point(&current_point);
+    json["dd"]["cpo"][0] = current_point.x;
+    json["dd"]["cpo"][1] = current_point.y;
+    json["dd"]["cpo"][2] = current_point.theta;
+    kalman_info_t current_pose;
+    diff_drive_get_current_pose(&current_pose);
+    json["dd"]["cpop"][0] = current_pose.x;
+    json["dd"]["cpop"][1] = current_pose.y;
+    json["dd"]["cpop"][2] = current_pose.theta;
+    json["dd"]["cpop"][3] = current_pose.x_p;
+    json["dd"]["cpop"][4] = current_pose.y_p;
+    json["dd"]["cpop"][5] = current_pose.theta_p;
+
+    /* Get traction data */
+    json["tc"]["st"] = tract_ctrl_get_state_string();
+
+    /* Get state machine */
+    json["sm"]["st"] = state_machine_get_state_string();
+    if(strcmp("SM_STATE_ERROR", json["sm"]["st"]) == 0)
+        json["sm"]["er"] = state_machine_get_error_string();
+
+    serializeJson(json, msg, 200);
+    strcat(msg, "\n");
+    //printf("%s\n", msg);
+    
+}
+
 /**
  * @brief The data received have the format: / * code,(char[3]),(args) * /
  * depending on the code there will be different args or none.
@@ -123,6 +163,10 @@ esp_err_t data_center_parse_data(char *data, data_center_msg_t *msg)
     {
         msg->code = SM_CMD_ECHO;
         ESP_LOGI(TAG, "Command received: ECHO");
+
+        char msg[200];
+        data_center_recolect_data(msg);
+        data_center_send_vehicle_data(msg);
     }
     else
     {
@@ -133,45 +177,6 @@ esp_err_t data_center_parse_data(char *data, data_center_msg_t *msg)
     return ESP_OK;
 }
 
-/* Colect data while */
-void data_center_recolect_data(char *msg)
-{
-    // Clear the json document 
-    json.clear();
-
-    /* Get waypoint data */ 
-    json["wp"]["st"] = waypoint_get_state_string();
-    json["wp"]["no_p"] = waypoint_get_point_number();
-    
-    /* Get diff drive data */
-    json["dd"]["st"] = diff_drive_get_state_string();
-    navigation_point_t current_point;
-    diff_drive_get_current_point(&current_point);
-    json["dd"]["cpo"][0] = current_point.x;
-    json["dd"]["cpo"][1] = current_point.y;
-    json["dd"]["cpo"][2] = current_point.theta;
-    kalman_info_t current_pose;
-    diff_drive_get_current_pose(&current_pose);
-    json["dd"]["cpop"][0] = current_pose.x;
-    json["dd"]["cpop"][1] = current_pose.y;
-    json["dd"]["cpop"][2] = current_pose.theta;
-    json["dd"]["cpop"][3] = current_pose.x_p;
-    json["dd"]["cpop"][4] = current_pose.y_p;
-    json["dd"]["cpop"][5] = current_pose.theta_p;
-
-    /* Get traction data */
-    json["tc"]["st"] = tract_ctrl_get_state_string();
-
-    /* Get state machine */
-    json["sm"]["st"] = state_machine_get_state_string();
-    if(strcmp("SM_STATE_ERROR", json["sm"]["st"]) == 0)
-        json["sm"]["er"] = state_machine_get_error_string();
-
-    serializeJson(json, msg, 200);
-    strcat(msg, "\n");
-    //printf("%s\n", msg);
-    
-}
 
 esp_err_t data_center_receive_lora_data(void)
 {
@@ -222,9 +227,9 @@ static void data_center_task(void *args)
     for (;;)
     {
         data_center_receive_lora_data();
-        data_center_send_lora_data();
+        //data_center_send_lora_data();
         
-        vTaskDelay(pdMS_TO_TICKS(2500));
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 
