@@ -6,173 +6,55 @@ extern "C"
 #include "freertos/queue.h"
 #include "esp_log.h"
 #include "esp_check.h"
-#include "esp_timer.h"
 
+#include "traction_control.h"
 #include "kalman_filter.h"
 #include "traction_control.h"
+#include "waypoint_controller.h"
 #include "lora_rf_task_common.h"
 #include "lora_rf_unit.h"
 }
 
+#include "ArduinoJson.h"
 #include "data_center.h"
 #include "data_center_task_common.h"
 #include <cstring>
 
-typedef enum
-{
-    KALMAN_AND_TRACTION_DATA,
-    KALMAN_DATA,
-    TRACTION_DATA,
-    NONE,
-} data_center_sources_e;
-
 const char TAG[] = "data_center";
 
-static QueueHandle_t g_data_center_queue_handle = NULL;
-static kalman_info_t kalman_data;
-static motor_pair_data_t traction_data;
-static QueueHandle_t g_lora_data2send_queue = NULL;
-static QueueHandle_t g_lora_received_queue = NULL;
-static esp_timer_handle_t g_data_center_timer = NULL;
-static data_center_send_status_e g_data_center_send_status = STOPPED_TX;
-static data_center_reception_e g_data_center_reception_status = STOPPED_RX;
-static data_center_sources_e g_data_center_sources = NONE;
+static QueueHandle_t g_data_center_data_queue = NULL;
+static QueueHandle_t g_lora_received_data_queue = NULL;
+static QueueHandle_t g_lora_transmit_data_queue = NULL;
+static JsonDocument json;
 
-esp_err_t data_center_get_queue_handle(QueueHandle_t *queue)
+esp_err_t data_center_get_data_queue(QueueHandle_t *queue)
 {
-    ESP_RETURN_ON_FALSE(queue != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue is NULL");
+    ESP_RETURN_ON_FALSE(g_data_center_data_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue is NULL");
 
-    *queue = g_data_center_queue_handle;
+    *queue = g_data_center_data_queue;
 
     return ESP_OK;
 }
 
-static void data_center_send_data(void *args)
-{
-    char frame[RF_DATA_LENGTH];
-    memset(frame, 0, RF_DATA_LENGTH);
-
-    char code[4];
-    memset(code, 0, 4);
-
-    switch (g_data_center_sources)
-    {
-    case KALMAN_AND_TRACTION_DATA:
-        strcpy(code, "KT");
-        break;
-
-    case KALMAN_DATA:
-        strcpy(code, "K");
-        break;
-
-    case TRACTION_DATA:
-        strcpy(code, "T");
-        break;
-
-    case NONE:
-    default:
-        strcpy(code, "N");
-        break;
-    }
-
-    switch (g_data_center_sources)
-    {
-    case KALMAN_AND_TRACTION_DATA:
-        sprintf(frame, "/*%s,x,%.4f,y,%.4f,theta,%.4f,x_p,%.4f,y_p,%.4f,z_p,%.4f,theta_p,%.4f,mleft_real_pulses,%d,mright_real_pulses,%d,mleft_set_point,%d,mright_set_point,%d*/",
-                code, kalman_data.x, kalman_data.y, kalman_data.theta, kalman_data.x_p, kalman_data.y_p, kalman_data.z_p, kalman_data.theta_p,
-                traction_data.mleft_pulses, traction_data.mright_pulses, traction_data.mleft_set_point, traction_data.mright_set_point);
-        break;
-
-    case KALMAN_DATA:
-        sprintf(frame, "/*code,%s,x,%.4f,y,%.4f,theta,%.4f,x_p,%.4f,y_p,%.4f,z_p,%.4f,theta_p,%.4f*/",
-                code, kalman_data.x, kalman_data.y, kalman_data.theta, kalman_data.x_p, kalman_data.y_p, kalman_data.z_p, kalman_data.theta_p);
-        break;
-
-    case TRACTION_DATA:
-        sprintf(frame, "/*code,%s,mleft_real_pulses,%d,mright_real_pulses,%d,mleft_set_point,%d,mright_set_point,%d*/",
-                code, traction_data.mleft_pulses, traction_data.mright_pulses, traction_data.mleft_set_point, traction_data.mright_set_point);
-        break;
-
-    case NONE:
-    default:
-        // Handle the case where no data is available
-        sprintf(frame, "/*code,%s*/", code);
-        break;
-    }
-
-    if (xQueueSend(g_lora_data2send_queue, frame, pdMS_TO_TICKS(100)) != pdPASS)
-    {
-        ESP_LOGE(TAG, "Error sending data to queue");
-    }
-}
-
-esp_err_t data_center_start_receiving(void)
-{
-    ESP_LOGI(TAG, "Data center start receiving");
-
-    if (g_data_center_reception_status == RECEIVING)
-    {
-        ESP_LOGW(TAG, "Data center is already receiving data");
-        return ESP_OK;
-    }
-
-    g_data_center_reception_status = RECEIVING;
-
-    return ESP_OK;
-}
-
-esp_err_t data_center_stop_receiving(void)
-{
-    ESP_LOGI(TAG, "Data center stop receiving");
-
-    if (g_data_center_reception_status == STOPPED_RX)
-    {
-        ESP_LOGW(TAG, "Data center is already stopped receiving data");
-        return ESP_OK;
-    }
-
-    g_data_center_reception_status = STOPPED_RX;
-    return ESP_OK;
-}
-
-esp_err_t data_center_start_sending(void)
-{
-    ESP_LOGI(TAG, "Data center start sending");
-
-    if (g_data_center_send_status == SENDING)
-    {
-        ESP_LOGW(TAG, "Data center is already sending data");
-        return ESP_OK;
-    }
-
-    ESP_ERROR_CHECK(esp_timer_start_periodic(g_data_center_timer, DATA_CENTER_SEND_PERIOD_MS * 1000));
-
-    g_data_center_send_status = SENDING;
-    return ESP_OK;
-}
-
-esp_err_t data_center_stop_sending(void)
-{
-    ESP_LOGI(TAG, "Data center stop sending");
-
-    if (g_data_center_send_status == STOPPED_TX)
-    {
-        ESP_LOGW(TAG, "Data center is already stopped");
-        return ESP_OK;
-    }
-
-    ESP_ERROR_CHECK(esp_timer_stop(g_data_center_timer));
-
-    g_data_center_send_status = STOPPED_TX;
-
-    return ESP_OK;
-}
 
 esp_err_t data_center_send2queue(data_center_msg_t *msg)
 {
-    if (xQueueSend(g_data_center_queue_handle, msg, pdMS_TO_TICKS(100)) != pdPASS)
+    if (xQueueSend(g_data_center_data_queue, msg, pdMS_TO_TICKS(100)) != pdPASS)
     {
         ESP_LOGE(TAG, "Error sending data to queue");
+        return ESP_FAIL;
+    }
+
+    return ESP_OK;
+}
+
+esp_err_t data_center_send_vehicle_data(char *msg)
+{
+    ESP_RETURN_ON_FALSE(msg != NULL, ESP_ERR_INVALID_STATE, TAG, "Trying to send null msg to lora!");
+    
+    if(xQueueSend(g_lora_transmit_data_queue, msg, pdMS_TO_TICKS(100)) != pdPASS)
+    {
+        ESP_LOGE(TAG, "Error sendig vehicle data to queue");
         return ESP_FAIL;
     }
 
@@ -195,14 +77,12 @@ esp_err_t data_center_parse_data(char *data, data_center_msg_t *msg)
     if (strstr(data, "/*") == NULL || strstr(data, "*/") == NULL)
     {
         ESP_LOGE(TAG, "Invalid data format");
+        printf("%s\n", data);
         return ESP_FAIL;
     }
 
     // Extract the code
     sscanf(data, "/*%3s", code);
-
-    float x, y, theta;
-    x = y = theta = 0.0f;
 
     msg->args[0] = msg->args[1] = msg->args[2] = 0.0f;
 
@@ -229,7 +109,9 @@ esp_err_t data_center_parse_data(char *data, data_center_msg_t *msg)
     else if (strcmp(code, "NVP") == 0) // SM_CMD_ADD_WAYPOINT
     {
         msg->code = SM_CMD_ADD_WAYPOINT;
-        sscanf(data, "/*%*s,%f,%f,%f*/", &msg->args[0], &msg->args[1], &msg->args[2]);
+        // sscanf(data, "/%*[^,],%f,%f,%f*/", &x, &y, &theta);
+        // ESP_LOGI(TAG, "Command received: ADD_WAYPOINT, x = %.2f, y = %.2f, theta = %.2f", x, y, theta);
+        sscanf(data, "/%*[^,],%f,%f,%f*/", &msg->args[0], &msg->args[1], &msg->args[2]);
         ESP_LOGI(TAG, "Command received: ADD_WAYPOINT, x = %.2f, y = %.2f, theta = %.2f", msg->args[0], msg->args[1], msg->args[2]);
     }
     else if (strcmp(code, "RST") == 0) // SM_CMD_RESET
@@ -251,52 +133,98 @@ esp_err_t data_center_parse_data(char *data, data_center_msg_t *msg)
     return ESP_OK;
 }
 
-static void data_center_recolect_data(void *args)
+/* Colect data while */
+void data_center_recolect_data(char *msg)
 {
+    // Clear the json document 
+    json.clear();
+
+    /* Get waypoint data */ 
+    json["wp"]["st"] = waypoint_get_state_string();
+    json["wp"]["no_p"] = waypoint_get_point_number();
+    
+    /* Get diff drive data */
+    json["dd"]["st"] = diff_drive_get_state_string();
+    navigation_point_t current_point;
+    diff_drive_get_current_point(&current_point);
+    json["dd"]["cpo"][0] = current_point.x;
+    json["dd"]["cpo"][1] = current_point.y;
+    json["dd"]["cpo"][2] = current_point.theta;
+    kalman_info_t current_pose;
+    diff_drive_get_current_pose(&current_pose);
+    json["dd"]["cpop"][0] = current_pose.x;
+    json["dd"]["cpop"][1] = current_pose.y;
+    json["dd"]["cpop"][2] = current_pose.theta;
+    json["dd"]["cpop"][3] = current_pose.x_p;
+    json["dd"]["cpop"][4] = current_pose.y_p;
+    json["dd"]["cpop"][5] = current_pose.theta_p;
+
+    /* Get traction data */
+    json["tc"]["st"] = tract_ctrl_get_state_string();
+
+    /* Get state machine */
+    json["sm"]["st"] = state_machine_get_state_string();
+    if(strcmp("SM_STATE_ERROR", json["sm"]["st"]) == 0)
+        json["sm"]["er"] = state_machine_get_error_string();
+
+    serializeJson(json, msg, 200);
+    strcat(msg, "\n");
+    //printf("%s\n", msg);
+    
 }
 
-static void data_center_receive_task(void *args)
+esp_err_t data_center_receive_lora_data(void)
+{
+    char received_data[200];
+    data_center_msg_t msg;
+    //memset(received_data, 0, 200);
+
+
+    if (xQueueReceive(g_lora_received_data_queue, received_data, pdMS_TO_TICKS(100)) == pdPASS)
+    {
+        //printf("DATA_CENTER: %s\n", received_data);
+        data_center_parse_data(received_data, &msg);
+        ESP_ERROR_CHECK(data_center_send2queue(&msg));
+    }
+
+    return ESP_OK;
+}
+
+esp_err_t data_center_send_lora_data(void)
+{
+    if(lora_is_available())
+    {
+        char msg[200];
+        data_center_recolect_data(msg);
+        data_center_send_vehicle_data(msg);
+    }
+
+    return ESP_OK;
+}
+
+static void data_center_task(void *args)
 {
     ESP_LOGI(TAG, "Iniatiliazing data center receiving task");
-    ESP_ERROR_CHECK(lora_get_queue_data_received(&g_lora_received_queue));
 
-    char received_data[RF_DATA_LENGTH];
-    memset(received_data, 0, RF_DATA_LENGTH);
+    g_data_center_data_queue = xQueueCreate(5, sizeof(data_center_msg_t));
 
-
-    for (;;)
+    while(lora_get_received_data_queue(&g_lora_received_data_queue))
     {
-        if (xQueueReceive(g_lora_received_queue, received_data, pdMS_TO_TICKS(100)) == pdPASS)
-        {
-            data_center_msg_t data_center_msg;
-            ESP_ERROR_CHECK(data_center_parse_data(received_data, &data_center_msg));
-            ESP_ERROR_CHECK(data_center_send2queue(&data_center_msg));
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(10));
+        ESP_LOGE(TAG, "Cannot get the lora_received_data_queue. Retrying...");
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
-}
-
-static void data_center_send_task(void *args)
-{
-    ESP_LOGI(TAG, "Iniatiliazing sendig task");
-
-    esp_timer_create_args_t data_center_timer_args = {
-        .callback = data_center_recolect_data,
-        .arg = NULL,
-        .dispatch_method = ESP_TIMER_ISR,
-        .name = "data_center_timer",
-        .skip_unhandled_events = false};
-
-    ESP_ERROR_CHECK(esp_timer_create(&data_center_timer_args, &g_data_center_timer));
-
-    ESP_LOGI(TAG, "Starting sending periodic timer");
-    ESP_ERROR_CHECK(esp_timer_start_periodic(g_data_center_timer, DATA_CENTER_SEND_PERIOD_MS));
+    while(lora_get_transmit_data_queue(&g_lora_transmit_data_queue))
+    {
+        ESP_LOGE(TAG, "Cannot get the lora_transmit_data_queue. Retrying...");
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
 
     for (;;)
     {
-
-        vTaskDelay(pdMS_TO_TICKS(10));
+        data_center_receive_lora_data();
+        data_center_send_lora_data();
+        
+        vTaskDelay(pdMS_TO_TICKS(2500));
     }
 }
 
@@ -304,9 +232,5 @@ void data_center_task_start(void)
 {
     ESP_LOGI(TAG, "Data center task started");
 
-    g_data_center_queue_handle = xQueueCreate(5, sizeof(data_center_msg_t));
-
-    xTaskCreatePinnedToCore(data_center_send_task, "dc_send_task", DATA_CENTER_TASK_STACK_SIZE, NULL, DATA_CENTER_TASK_PRIORITY, NULL, DATA_CENTER_TASK_CORE_ID);
-
-    xTaskCreatePinnedToCore(data_center_receive_task, "dc_receive_task", DATA_CENTER_TASK_STACK_SIZE, NULL, DATA_CENTER_TASK_PRIORITY, NULL, DATA_CENTER_TASK_CORE_ID);
+    xTaskCreatePinnedToCore(data_center_task, "data_center_task", DATA_CENTER_TASK_STACK_SIZE, NULL, DATA_CENTER_TASK_PRIORITY, NULL, DATA_CENTER_TASK_CORE_ID);
 }

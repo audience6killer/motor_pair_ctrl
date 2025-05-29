@@ -18,17 +18,18 @@ typedef enum {
     RECEIVING
 } data_center_reception_e;
 
-/*
 typedef struct {
     state_machine_cmd_e code;
     float args[3];
 } data_center_msg_t;
-*/
+
  // Task state
 typedef enum {
     INIT = 0,
     READY,
 } data_center_state_e; 
+
+esp_err_t data_center_get_vehicle_data_queue(QueueHandle_t *queue);
 
 /**
  * @brief Get the data center queue handle object. 
@@ -36,7 +37,7 @@ typedef enum {
  * @param queue 
  * @return esp_err_t 
  */
-esp_err_t data_center_get_queue_handle(QueueHandle_t *queue);
+esp_err_t data_center_get_data_queue(QueueHandle_t *queue);
 
 /**
  * @brief Start receiving data from the RF module. 

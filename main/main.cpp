@@ -7,10 +7,10 @@ extern "C"
 #include "diff_drive_ctrl.h"
 #include "waypoint_controller.h"
 #include "state_machine.h"
-//#include "data_center.h"
-//#include "lora_rf_unit.h"
+#include "data_center.h"
+#include "lora_rf_unit.h"
 
-#include "fake_data_center.h"
+// #include "fake_data_center.h"
     // #include "seed_planter_control.h"
     // #include "test_seed_planter.h"
 }
@@ -28,8 +28,9 @@ extern "C" void app_main(void)
     kalman_filter_start_task();
     diff_drive_ctrl_task_start();
     waypoint_start_task();
-    // lora_task_start();
-    fake_data_center_task_start();
+    data_center_task_start();
+    lora_task_start();
+    // fake_data_center_task_start();
 
     state_machine_task_start();
 

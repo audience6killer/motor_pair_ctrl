@@ -92,6 +92,31 @@ typedef struct
     motor_pair_state_e state;
 } motor_pair_data_t;
 
+static inline const char *motor_pair_state_to_string(motor_pair_state_e state)
+{
+    static const char *states[] = {
+        "STOPPED",
+        "BRAKE",
+        "COAST",
+        "STARTING",
+        "FORWARD",
+        "REVERSE",
+        "TURN_LEFT_FORWARD",
+        "TURN_RIGHT_FORWARD",
+        "TURN_LEFT_REVERSE",
+        "TURN_RIGHT_REVERSE",
+        "MP_BUSY",
+        "MP_READY"
+    };
+
+    if (state >= STOPPED && state <= MP_READY)
+    {
+        return states[state];
+    }
+    return "UNKNOWN_STATE";
+}
+
+
 /**
  * @brief Initialize motor pair unit
  * 

@@ -17,3 +17,4 @@ dependencies:
   #   # All dependencies of `main` are public by default.
   #   public: true
   espressif/arduino-esp32: ^3.0.7
+  bblanchon/arduinojson: ^7.4.1

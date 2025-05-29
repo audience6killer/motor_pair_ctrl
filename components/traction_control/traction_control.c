@@ -51,6 +51,10 @@ motor_pair_state_e tract_ctrl_get_current_state(void)
 {
     return g_traction_state;
 }
+const char* tract_ctrl_get_state_string(void)
+{
+    return motor_pair_state_to_string(g_traction_state);
+}
 
 esp_err_t tract_ctrl_get_data_queue(QueueHandle_t *queue)
 {

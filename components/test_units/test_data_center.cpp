@@ -24,7 +24,7 @@ void test_data_center_task(void *args)
     char data[200];
     memset(data, 0, 200);
 
-    ESP_ERROR_CHECK( data_center_get_queue_handle(&data_center_queue) );
+    ESP_ERROR_CHECK( data_center_get_data_queue(&data_center_queue) );
 
     ESP_ERROR_CHECK( data_center_start_receiving() );
 

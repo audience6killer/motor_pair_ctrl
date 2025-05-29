@@ -66,6 +66,10 @@ extern "C"
         return "UNKNOWN_STATE";
     }
 
+    const char* waypoint_get_state_string(void);
+
+    int waypoint_get_point_number(void);
+
     esp_err_t waypoint_get_event_group(EventGroupHandle_t *handle);
 
     esp_err_t waypoint_get_error_group(EventGroupHandle_t *handle);

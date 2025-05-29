@@ -8,14 +8,16 @@ extern "C"
 #include "esp_log.h"
 #include "esp_check.h"
 
-// #include "data_center.h"
-#include "fake_data_center.h"
-// #include "lora_rf_unit.h"
+#include "data_center.h"
+// #include "fake_data_center.h"
+//  #include "lora_rf_unit.h"
 #include "waypoint_controller.h"
 
 #include "state_machine.h"
 #include "state_machine_task_common.h"
 }
+
+#include <string.h>
 
 static const char TAG[] = "state_machine";
 static QueueHandle_t g_waypoint_cmd_queue = NULL;
@@ -23,9 +25,34 @@ static QueueHandle_t g_waypoint_status_queue = NULL;
 static QueueHandle_t g_kalman_cmd_handle = NULL;
 static QueueHandle_t g_data_center_data_queue = NULL;
 static bool g_is_running_traj = false;
+static state_machine_state_e g_state_machine_state = SM_STATE_IDLE;
+static char g_error_string[100];
 
 static EventGroupHandle_t g_waypoint_event_group = NULL;
 static EventGroupHandle_t g_waypoint_error_group = NULL;
+
+const char *state_machine_get_state_string(void)
+{
+    return state_machine_state_to_string(g_state_machine_state);
+}
+
+const char *state_machine_get_error_string(void)
+{
+    // Return the error string and clear it after reading
+    static char temp[sizeof(g_error_string)];
+    strncpy(temp, g_error_string, sizeof(g_error_string));
+    temp[sizeof(g_error_string) - 1] = '\0'; // Ensure null-termination
+    memset(g_error_string, 0, sizeof(g_error_string));
+    return temp;
+}
+
+esp_err_t state_machine_set_error(char *error_msg)
+{
+    g_state_machine_state = SM_STATE_ERROR;
+    strncpy(g_error_string, error_msg, sizeof(*error_msg));
+
+    return ESP_OK;
+}
 
 /* Event handlers */
 esp_err_t state_machine_start_event_handler(void)
@@ -35,7 +62,9 @@ esp_err_t state_machine_start_event_handler(void)
 
     if (xQueueSend(g_kalman_cmd_handle, &cmd_k, pdMS_TO_TICKS(100)) != pdPASS)
     {
-        ESP_LOGE(TAG, "Error: Cannot send start command to kalman task");
+        char msg[] = "Error: Cannot send start command to kalman task";
+        ESP_LOGE(TAG, "%s", msg);
+        state_machine_set_error(msg);
         return ESP_FAIL;
     }
 
@@ -46,7 +75,10 @@ esp_err_t state_machine_start_event_handler(void)
     };
     if (xQueueSend(g_waypoint_cmd_queue, &cmd_start, pdMS_TO_TICKS(100)) != pdPASS)
     {
-        ESP_LOGE(TAG, "Error: Cannot send start trajectory command to waypoint task");
+        char msg[] = "Error: Cannot send start trajectory command to waypoint task";
+        ESP_LOGE(TAG, "%s", msg);
+
+        state_machine_set_error(msg);
         return ESP_FAIL;
     }
 
@@ -66,27 +98,38 @@ esp_err_t state_machine_start_event_handler(void)
 
         if ((error_flag & WP_ERROR_EMPTY_NAV_POINTS) != 0)
         {
-            ESP_LOGE(TAG, "Error: the navigation points are empty");
+            char msg[] = "Error: the navigation points are empty";
+            ESP_LOGE(TAG, "%s", msg);
+            state_machine_set_error(msg);
         }
         else if ((error_flag & WP_ERROR_CANNOT_START_TRACT) != 0)
         {
-            ESP_LOGE(TAG, "Error: Cannot start tract");
+            char msg[] = "Error: Cannot start tract";
+            ESP_LOGE(TAG, "%s", msg);
+            state_machine_set_error(msg);
         }
         else if ((error_flag & WP_ERROR_CANNOT_SEND_FPOINT) != 0)
         {
-            ESP_LOGE(TAG, "Error: Cannot send first point tp diff drive");
+            char msg[] = "Error: Cannot send first point tp diff drive";
+            ESP_LOGE(TAG, "%s", msg);
+            state_machine_set_error(msg);
         }
         else
         {
-            ESP_LOGE(TAG, "Error: Cannot get error bits");
+            char msg[] = "Error: Cannot get error bits";
+            ESP_LOGE(TAG, "%s", msg);
+            state_machine_set_error(msg);
         }
     }
     else
     {
         /* error handling */
-        ESP_LOGE(TAG, "Error: Waypoint statuts bits were not received");
+        char msg[] = "Error: Waypoint statuts bits were not received";
+        ESP_LOGE(TAG, "%s", msg);
+        state_machine_set_error(msg);
     }
 
+    g_state_machine_state = SM_STATE_STARTED;
     return ESP_OK;
 }
 
@@ -120,6 +163,7 @@ esp_err_t state_machine_stop_event_handler(void)
         ESP_LOGE(TAG, "Trajectory stopped successfully");
     }
 
+    g_state_machine_state = SM_STATE_STOPPED;
     return ESP_OK;
 }
 
@@ -155,6 +199,7 @@ esp_err_t state_machine_nav_point_event_handler(float x, float y, float theta)
         ESP_LOGE(TAG, "Error: No flags were received");
     }
 
+    g_state_machine_state = SM_STATE_WAYPOINT_ADDED;
     return ESP_OK;
 }
 
@@ -200,7 +245,7 @@ void state_machine_event_handler(void)
 void state_machine_receive_waypoint_state(void)
 {
     waypoint_state_e wp_state;
-    if(xQueueReceive(g_waypoint_status_queue, &wp_state, pdMS_TO_TICKS(10)) == pdPASS)
+    if (xQueueReceive(g_waypoint_status_queue, &wp_state, pdMS_TO_TICKS(10)) == pdPASS)
     {
         const char *state = waypoint_state_to_string(wp_state);
         ESP_LOGI(TAG, "Waypoint State: %s", state);
@@ -213,7 +258,7 @@ static void state_machine_task(void *pvParameters)
     ESP_LOGI(TAG, "Initilizing State machine task started");
 
     /* Get data center data queue */
-    while (data_center_get_queue_handle(&g_data_center_data_queue) != ESP_OK)
+    while (data_center_get_data_queue(&g_data_center_data_queue) != ESP_OK)
     {
         ESP_LOGE(TAG, "Error: Cannot get data_center data queue. Retrying...");
         vTaskDelay(pdMS_TO_TICKS(50));
@@ -246,11 +291,14 @@ static void state_machine_task(void *pvParameters)
         vTaskDelay(pdMS_TO_TICKS(50));
     }
 
+    /* Initialize error string */
+    memset(g_error_string, 0, sizeof(g_error_string));
+
     for (;;)
     {
         state_machine_event_handler();
 
-        if(g_is_running_traj)
+        if (g_is_running_traj)
         {
             state_machine_receive_waypoint_state();
         }

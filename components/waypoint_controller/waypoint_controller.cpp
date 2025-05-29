@@ -57,6 +57,16 @@ esp_err_t waypoint_get_error_group(EventGroupHandle_t *handle)
     return ESP_OK;
 }
 
+const char* waypoint_get_state_string(void)
+{
+    return waypoint_state_to_string(g_waypoint_state);
+}
+
+int waypoint_get_point_number(void)
+{
+    return g_navigation_points.size();
+}
+
 esp_err_t waypoint_send2queue(waypoint_state_e state)
 {
     g_waypoint_state = state;

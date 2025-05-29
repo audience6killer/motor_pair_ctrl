@@ -37,6 +37,7 @@ static diff_drive_ctrl_handle_t *diff_drive_handle = NULL;
 static QueueHandle_t g_traction_cmd_queue = NULL;
 static QueueHandle_t g_kalman_data_queue;
 
+static kalman_info_t g_vehicle_pose;
 static diff_drive_state_e g_diff_drive_state;
 static diff_drive_err_t g_diff_drive_error;
 static navigation_point_t g_current_point;
@@ -46,6 +47,25 @@ static bool g_is_oriented = false;
 
 /* Function declarations */
 esp_err_t diff_drive_send2traction(tract_ctrl_cmd_t cmd);
+
+const char *diff_drive_get_state_string(void)
+{
+    return diff_drive_state_to_string(g_diff_drive_state);
+}
+
+esp_err_t diff_drive_get_current_point(navigation_point_t *point)
+{
+    *point = g_current_point;
+
+    return ESP_OK;
+}
+
+esp_err_t diff_drive_get_current_pose(kalman_info_t *pose)
+{
+    *pose = g_vehicle_pose;
+    
+    return ESP_OK;
+}
 
 esp_err_t diff_drive_update_state(diff_drive_state_e state)
 {
@@ -242,7 +262,7 @@ esp_err_t diff_drive_send2traction(tract_ctrl_cmd_t cmd)
 
 void diff_drive_receive_kalman_data(void)
 {
-    static kalman_info_t vehicle_pose = (kalman_info_t){
+    g_vehicle_pose = (kalman_info_t){
         .x = 0.0f,
         .y = 0.0f,
         .z = 0.0f,
@@ -252,9 +272,8 @@ void diff_drive_receive_kalman_data(void)
         .z_p = 0.0f,
         .theta_p = 0.0f,
     };
-    static int counter = 0;
 
-    if (xQueueReceive(g_kalman_data_queue, &vehicle_pose, pdMS_TO_TICKS(5)) == pdPASS)
+    if (xQueueReceive(g_kalman_data_queue, &g_vehicle_pose, pdMS_TO_TICKS(5)) == pdPASS)
     {
         // printf("kalman received in diff_drive\n");
         // if (counter % 100 == 0)
@@ -268,7 +287,7 @@ void diff_drive_receive_kalman_data(void)
         // counter++;
 
         if (g_diff_drive_state != DD_STATE_POINT_REACHED)
-            ESP_ERROR_CHECK(diff_drive_point_follower(&vehicle_pose));
+            ESP_ERROR_CHECK(diff_drive_point_follower(&g_vehicle_pose));
     }
 }
 

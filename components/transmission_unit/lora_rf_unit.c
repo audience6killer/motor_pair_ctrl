@@ -14,22 +14,33 @@
 #include "lora_rf_unit.h"
 
 static QueueHandle_t communication_RF_queue = NULL;
-static QueueHandle_t g_data_center_data_queue = NULL;
+static QueueHandle_t g_lora_received_data_queue = NULL;
+static QueueHandle_t g_lora_transmit_data_queue = NULL;
 
 const char TAG[] = "LoRa";
 
-esp_err_t data_center_get_queue_handle(QueueHandle_t *queue)
+esp_err_t lora_get_received_data_queue(QueueHandle_t *queue)
 {
-    ESP_RETURN_ON_FALSE(queue != NULL, ESP_ERR_INVALID_STATE, TAG, "Queue is NULL");
+    ESP_RETURN_ON_FALSE(g_lora_received_data_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "received_queue is null while retriving");
 
-    *queue = g_data_center_data_queue;
+    *queue = g_lora_received_data_queue;
 
     return ESP_OK;
 }
 
-esp_err_t data_center_send2queue(data_center_msg_t *msg)
+esp_err_t lora_get_transmit_data_queue(QueueHandle_t *queue)
 {
-    if (xQueueSend(g_data_center_data_queue, msg, pdMS_TO_TICKS(100)) != pdPASS)
+    ESP_RETURN_ON_FALSE(g_lora_transmit_data_queue != NULL, ESP_ERR_INVALID_STATE, TAG, "transmit_queue is null while retriving");
+
+    *queue = g_lora_transmit_data_queue;
+
+    return ESP_OK;
+}
+
+esp_err_t lora_send_to_data_center_queue(char *msg)
+{
+    // printf("TO SEND: %s\n", msg);
+    if (xQueueSend(g_lora_received_data_queue, msg, pdMS_TO_TICKS(100)) != pdPASS)
     {
         ESP_LOGE(TAG, "Error sending data to queue");
         return ESP_FAIL;
@@ -38,80 +49,40 @@ esp_err_t data_center_send2queue(data_center_msg_t *msg)
     return ESP_OK;
 }
 
-esp_err_t lora_parse_received_data(char *data, data_center_msg_t *msg)
+inline bool lora_is_available()
 {
-    char code[4];
+    return gpio_get_level(RF_AUX_PIN) == 1 ? true : false;
+}
 
-    // Check if the data is valid
-    if (strstr(data, "/*") == NULL || strstr(data, "*/") == NULL)
-    {
-        ESP_LOGE(TAG, "Invalid data format");
-        return ESP_FAIL;
-    }
+static void lora_transmit_task(void *pvParameters)
+{
+    ESP_LOGI(TAG, "Starting transmit task");
+    char received_data[RF_DATA_LENGTH];
 
-    // Extract the code
-    sscanf(data, "/*%3s", code);
+    for (;;)
+    {
+        if (xQueueReceive(g_lora_transmit_data_queue, received_data, pdMS_TO_TICKS(WAIT_QUEUE_SEND_RF)) == pdPASS)
+        {
+            // printf("%s\n", received_data);
+            // Writes information to the UART port
+            uart_write_bytes(RF_UART_PORT, received_data, strlen(received_data));
 
-    float x, y, theta;
-    x = y = theta = 0.0f;
+            // Cleans result.
+            memset(received_data, 0, sizeof(received_data));
+        }
 
-    msg->args[0] = msg->args[1] = msg->args[2] = 0.0f;
-
-    if (strcmp(code, "SPN") == 0) // SM_CMD_STOP_NAV
-    {
-        msg->code = SM_CMD_STOP_NAV;
-        ESP_LOGI(TAG, "Command received: STOP_NAV");
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
-    else if (strcmp(code, "STN") == 0) // SM_CMD_START_NAV
-    {
-        msg->code = SM_CMD_START_NAV;
-        ESP_LOGI(TAG, "Command received: START_NAV");
-    }
-    else if (strcmp(code, "PSN") == 0) // SM_CMD_PAUSE_NAV
-    {
-        msg->code = SM_CMD_PAUSE_NAV;
-        ESP_LOGI(TAG, "Command received: PAUSE_NAV");
-    }
-    else if (strcmp(code, "RMN") == 0) // SM_CMD_RESUME_NAV
-    {
-        msg->code = SM_CMD_RESUME_NAV;
-        ESP_LOGI(TAG, "Command received: RESUME_NAV");
-    }
-    else if (strcmp(code, "NVP") == 0) // SM_CMD_ADD_WAYPOINT
-    {
-        msg->code = SM_CMD_ADD_WAYPOINT;
-        // sscanf(data, "/%*[^,],%f,%f,%f*/", &x, &y, &theta);
-        // ESP_LOGI(TAG, "Command received: ADD_WAYPOINT, x = %.2f, y = %.2f, theta = %.2f", x, y, theta);
-        sscanf(data, "/%*[^,],%f,%f,%f*/", &msg->args[0], &msg->args[1], &msg->args[2]);
-        ESP_LOGI(TAG, "Command received: ADD_WAYPOINT, x = %.2f, y = %.2f, theta = %.2f", msg->args[0], msg->args[1], msg->args[2]);
-    }
-    else if (strcmp(code, "RST") == 0) // SM_CMD_RESET
-    {
-        msg->code = SM_CMD_RESET;
-        ESP_LOGI(TAG, "Command received: RESET");
-    }
-    else if (strcmp(code, "ECH") == 0) // SM_CMD_ECHO
-    {
-        msg->code = SM_CMD_ECHO;
-        ESP_LOGI(TAG, "Command received: ECHO");
-    }
-    else
-    {
-        msg->code = SM_CMD_EMPTY;
-        ESP_LOGW(TAG, "Unknown command received: %s", code);
-    }
-
-    return ESP_OK;
 }
 
 static void lora_receive_task(void *pvParameters)
 {
-
+    ESP_LOGI(TAG, "Starting receive task");
     uart_event_t event_uart_rx;
-
     uint8_t *data = (uint8_t *)malloc(RF_UART_BUFFER_SIZE);
 
     char message_to_decode[RF_DATA_LENGTH];
+    char *msg = malloc(200);
 
     for (;;)
     {
@@ -124,36 +95,21 @@ static void lora_receive_task(void *pvParameters)
             {
             case UART_DATA:
                 // read from uart
+                ESP_LOGI(TAG, "Data received");
                 uart_read_bytes(RF_UART_PORT, (char *)data, event_uart_rx.size, pdMS_TO_TICKS(100));
 
                 // copy data into variable and add terminator
                 strncpy(message_to_decode, (char *)data, sizeof(message_to_decode) - 1);
                 message_to_decode[sizeof(message_to_decode) - 1] = '\0';
+                strncpy(msg, message_to_decode, 200 - 1);
+                msg[200 - 1] = '\0';
+                
+                //printf("%s\n", msg);
 
-                // Parse the received data
-                data_center_msg_t msg;
-                if (lora_parse_received_data(message_to_decode, &msg) == ESP_OK)
+                if (lora_send_to_data_center_queue(msg) != ESP_OK)
                 {
-                    // Send the parsed message to the queue
-                    ESP_LOGI(TAG, "msg: %d, dat1: %.2f, dat2: %.2f, dat3: %.2f", msg.code, msg.args[0], msg.args[1], msg.args[2]);
-
-                    if (data_center_send2queue(&msg) != pdPASS)
-                    {
-                        ESP_LOGE(TAG, "Failed to send message to queue");
-                    }
+                    ESP_LOGE(TAG, "Failed to send message to queue");
                 }
-                else
-                {
-                    ESP_LOGE(TAG, "Failed to parse received data");
-                }
-
-                /*
-                // send queue
-                if(xQueueSend(g_queue_data_received, message_to_decode, pdMS_TO_TICKS(100)) == pdFAIL)
-                {
-                    ESP_LOGE(TAG, "Error sending data to queue");
-                }
-                */
 
                 // Clean input.
                 uart_flush(RF_UART_PORT);
@@ -173,9 +129,8 @@ static void lora_receive_task(void *pvParameters)
 
 esp_err_t lora_task_init(void)
 {
-    g_data_center_data_queue = xQueueCreate(5, sizeof(data_center_msg_t));
-
     ESP_LOGI(TAG, "Initializing RF communication task");
+
     uart_config_t uart_RF_configuration = {
         .baud_rate = RF_UART_BAUDRATE_RF,
         .data_bits = RF_UART_DATA_BITS,
@@ -198,6 +153,13 @@ esp_err_t lora_task_init(void)
                                         &communication_RF_queue,
                                         ESP_INTR_FLAG_LEVEL3));
 
+    /* Configure GPIO for busy pin */
+    gpio_set_direction(RF_AUX_PIN, GPIO_MODE_DEF_INPUT);
+    gpio_set_pull_mode(RF_AUX_PIN, GPIO_PULLUP_ONLY);
+
+    g_lora_received_data_queue = xQueueCreate(5, 200);
+    g_lora_transmit_data_queue = xQueueCreate(5, 200);
+
     return ESP_OK;
 }
 
@@ -210,6 +172,14 @@ void lora_task_start(void)
     // Creates RF task to receive information.
     xTaskCreatePinnedToCore(lora_receive_task,
                             "lora_receive",
+                            RF_TASK_STACK_SIZE,
+                            NULL,
+                            RF_TASK_RECEIVE_PRIORITY,
+                            NULL,
+                            RF_TASK_CORE_ID);
+
+    xTaskCreatePinnedToCore(lora_transmit_task,
+                            "lora_send",
                             RF_TASK_STACK_SIZE,
                             NULL,
                             RF_TASK_RECEIVE_PRIORITY,

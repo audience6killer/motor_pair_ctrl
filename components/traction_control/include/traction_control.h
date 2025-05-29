@@ -29,6 +29,8 @@ typedef struct
     float *motor_right_speed;
 } tract_ctrl_cmd_t;
 
+const char* tract_ctrl_get_state_string(void);
+
 /**
  * @brief Get current state of the task 
  * 
