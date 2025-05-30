@@ -13,6 +13,7 @@ extern "C"
 #include "waypoint_controller.h"
 #include "lora_rf_task_common.h"
 #include "lora_rf_unit.h"
+#include "esp32_uart_unit.h"
 }
 
 #include "ArduinoJson.h"
@@ -35,7 +36,6 @@ esp_err_t data_center_get_data_queue(QueueHandle_t *queue)
 
     return ESP_OK;
 }
-
 
 esp_err_t data_center_send2queue(data_center_msg_t *msg)
 {

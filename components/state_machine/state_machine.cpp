@@ -9,6 +9,7 @@ extern "C"
 #include "esp_check.h"
 
 #include "data_center.h"
+#include "esp32_uart_unit.h"
 // #include "fake_data_center.h"
 //  #include "lora_rf_unit.h"
 #include "waypoint_controller.h"
@@ -256,6 +257,7 @@ void state_machine_receive_waypoint_state(void)
 static void state_machine_task(void *pvParameters)
 {
     ESP_LOGI(TAG, "Initilizing State machine task started");
+
 
     /* Get data center data queue */
     while (data_center_get_data_queue(&g_data_center_data_queue) != ESP_OK)
