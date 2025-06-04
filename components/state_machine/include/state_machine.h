@@ -16,6 +16,7 @@ extern "C"
         SM_CMD_ADD_WAYPOINT, // NVP
         SM_CMD_RESET,        // RST
         SM_CMD_ECHO,         // ECH
+        SM_CMD_ECHO_ESP32,   // ECE
     } state_machine_cmd_e;   // Commands sended from the state machine
 
     typedef enum

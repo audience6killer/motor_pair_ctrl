@@ -10,7 +10,7 @@
 // UART configuration
 #define ESP32_UART_BUFFER_SIZE                  256
 #define ESP32_UART_QUEUE_SIZE                   5
-#define ESP32_UART_PORT                         UART_NUM_1
+#define ESP32_UART_PORT                         UART_NUM_0
 #define ESP32_UART_TX_PIN                       GPIO_NUM_18
 #define ESP32_UART_RX_PIN                       GPIO_NUM_19
 #define ESP32_UART_RTS_PIN                      UART_PIN_NO_CHANGE

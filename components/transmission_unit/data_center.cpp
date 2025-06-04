@@ -168,6 +168,12 @@ esp_err_t data_center_parse_data(char *data, data_center_msg_t *msg)
         data_center_recolect_data(msg);
         data_center_send_vehicle_data(msg);
     }
+    else if (strcmp(code, "ECE") == 0) // SM_CMD_ECHO_ESP32
+    {
+        msg->code = SM_CMD_ECHO_ESP32;
+        ESP_LOGI(TAG, "Command received: ECHO ESP32");
+
+    }
     else
     {
         msg->code = SM_CMD_EMPTY;

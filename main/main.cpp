@@ -9,6 +9,7 @@ extern "C"
 #include "state_machine.h"
 #include "data_center.h"
 #include "lora_rf_unit.h"
+#include "esp32_uart_unit.h"
 
 // #include "fake_data_center.h"
     // #include "seed_planter_control.h"
@@ -21,7 +22,7 @@ extern "C" void app_main(void)
 {
     initArduino();
 
-    Serial.begin(115200);
+    //Serial.begin(115200);
 
     tract_ctrl_start_task();
     odometry_start_task();
@@ -30,10 +31,17 @@ extern "C" void app_main(void)
     waypoint_start_task();
     data_center_task_start();
     lora_task_start();
+    esp32_uart_task_start();
     // fake_data_center_task_start();
 
     state_machine_task_start();
 
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
+    esp32_uart_handshake();
+
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    esp32_uart_handshake();
     // test_waypoint_follower_task_start();
     // seed_planter_control_start_task();
     // test_seed_planter_start_task();
