@@ -41,7 +41,7 @@ typedef struct
 {
     diff_drive_cmd_e cmd;
 
-    navigation_point_t *point;
+    navigation_point_t point;
 } diff_drive_cmd_t;
 
 static inline const char *diff_drive_state_to_string(diff_drive_state_e state)

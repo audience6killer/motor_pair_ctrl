@@ -25,11 +25,12 @@ static QueueHandle_t g_waypoint_cmd_queue = NULL;
 static QueueHandle_t g_waypoint_status_queue = NULL;
 static QueueHandle_t g_kalman_cmd_handle = NULL;
 static QueueHandle_t g_data_center_data_queue = NULL;
-static QueueHandle_t g_esp32_uart_cmd_queue = NULL;
-static QueueHandle_t g_esp32_uart_event_queue = NULL;
+static QueueHandle_t g_esp32_uart_transmit_data_queue = NULL;
+static QueueHandle_t g_esp32_uart_received_data_queue = NULL;
 static bool g_is_running_traj = false;
 static state_machine_state_e g_state_machine_state = SM_STATE_IDLE;
 static char g_error_string[100];
+static waypoint_state_e g_wp_state;
 
 static EventGroupHandle_t g_waypoint_event_group = NULL;
 static EventGroupHandle_t g_waypoint_error_group = NULL;
@@ -39,24 +40,17 @@ const char *state_machine_get_state_string(void)
     return state_machine_state_to_string(g_state_machine_state);
 }
 
-esp_err_t state_machine_receive_sower_event(sower_event_t *event, uint32_t time_to_wait)
-{
-    if (xQueueReceive(g_esp32_uart_event_queue, &event, pdMS_TO_TICKS(time_to_wait)) != pdPASS)
-    {
-        ESP_LOGE(TAG, "Error: Failed to receive sower event");
-        return ESP_FAIL;
-    }
-
-    return ESP_OK;
-}
-
 bool state_machine_wait_for_sower_event(sower_events_e evt_to_wait, uint32_t time_to_wait)
 {
     sower_event_t event;
-    if (state_machine_receive_sower_event(&event, time_to_wait) == ESP_OK)
+
+    if (xQueueReceive(g_esp32_uart_received_data_queue, &event, pdMS_TO_TICKS(time_to_wait)) == pdTRUE)
     {
+        const char *event_name = sower_event_name(event.event);
+        printf("Event received: %s\n", event_name);
         return event.event == evt_to_wait;
     }
+    ESP_LOGE(TAG, "Error: Failed to receive sower event");
 
     return false;
 }
@@ -99,7 +93,7 @@ esp_err_t state_machine_start_event_handler(void)
         .code = SOWER_CMD_START_CUTTER,
         .arg = 0.0f,
     };
-    if (xQueueSend(g_esp32_uart_cmd_queue, &cmd_cutter, pdMS_TO_TICKS(100) != pdPASS))
+    if (xQueueSend(g_esp32_uart_transmit_data_queue, &cmd_cutter, pdMS_TO_TICKS(1000)) != pdTRUE)
     {
         char msg[] = "Error: Cannot send start cutter command";
         ESP_LOGE(TAG, "%s", msg);
@@ -113,13 +107,14 @@ esp_err_t state_machine_start_event_handler(void)
         ESP_LOGE(TAG, "Error: Cannot start cutter disk");
         return ESP_FAIL;
     }
+
     ESP_LOGI(TAG, "Cutter disk started successfully");
 
     sower_cmd_t cmd_linear_motor = {
         .code = SOWER_CMD_LINEAR_MOTOR_DOWN,
         .arg = 0.0f,
     };
-    if (xQueueSend(g_esp32_uart_cmd_queue, &cmd_linear_motor, pdMS_TO_TICKS(100) != pdPASS))
+    if (xQueueSend(g_esp32_uart_transmit_data_queue, &cmd_linear_motor, pdMS_TO_TICKS(1000)) != pdTRUE)
     {
         char msg[] = "Error: Cannot send descend linear motor";
         ESP_LOGE(TAG, "%s", msg);
@@ -140,7 +135,7 @@ esp_err_t state_machine_start_event_handler(void)
         .cmd = WP_CMD_START_TRAJ,
         .point = NULL,
     };
-    if (xQueueSend(g_waypoint_cmd_queue, &cmd_start, pdMS_TO_TICKS(100)) != pdPASS)
+    if (xQueueSend(g_waypoint_cmd_queue, &cmd_start, pdMS_TO_TICKS(100)) != pdTRUE)
     {
         char msg[] = "Error: Cannot send start trajectory command to waypoint task";
         ESP_LOGE(TAG, "%s", msg);
@@ -202,20 +197,23 @@ esp_err_t state_machine_start_event_handler(void)
 
 esp_err_t state_machine_stop_event_handler(void)
 {
+    /* Check whether the trajectory has already finished */
     /* Stop waypoint trajectory */
     waypoint_cmd_t cmd_stop = {
         .cmd = WP_CMD_STOP_TRAJ,
         .point = NULL,
     };
-
+    EventBits_t wp_status_flag = xEventGroupWaitBits(g_waypoint_event_group, WP_STOPPED | WP_ERROR, pdTRUE, pdFALSE, pdMS_TO_TICKS(50));
+    
+    /* Skip WP_CMD_STOP_TRAJ if trajectory already ended */
+    if(g_wp_state == WP_TRJ_FINISHED)
+        goto wp_finished;
+    
     if (xQueueSend(g_waypoint_cmd_queue, &cmd_stop, pdMS_TO_TICKS(100)) != pdPASS)
     {
         ESP_LOGE(TAG, "Error: Cannot send stop trajectory command to waypoint task");
         return ESP_FAIL;
     }
-
-    EventBits_t wp_status_flag = xEventGroupWaitBits(g_waypoint_event_group, WP_STOPPED | WP_ERROR, pdTRUE, pdFALSE, pdMS_TO_TICKS(50));
-
     if ((wp_status_flag & WP_STOPPED) != 0)
     {
         ESP_LOGI(TAG, "Trajectory stopped successfully");
@@ -230,12 +228,13 @@ esp_err_t state_machine_stop_event_handler(void)
         ESP_LOGE(TAG, "Trajectory stopped successfully");
     }
 
+wp_finished:
     /* Stop and lift the cutter */
     sower_cmd_t cmd_linear_motor = {
         .code = SOWER_CMD_LINEAR_MOTOR_UP,
         .arg = 0.0f,
     };
-    if (xQueueSend(g_esp32_uart_cmd_queue, &cmd_linear_motor, pdMS_TO_TICKS(100) != pdPASS))
+    if (xQueueSend(g_esp32_uart_transmit_data_queue, &cmd_linear_motor, pdMS_TO_TICKS(100)) != pdTRUE)
     {
         char msg[] = "Error: Cannot send lift linear motor";
         ESP_LOGE(TAG, "%s", msg);
@@ -244,19 +243,19 @@ esp_err_t state_machine_stop_event_handler(void)
         return ESP_FAIL;
     }
 
-    if (!state_machine_wait_for_sower_event(SOWER_EVENT_CUTTER_UP, 200))
+    if (!state_machine_wait_for_sower_event(SOWER_EVENT_CUTTER_UP, 1000))
     {
         ESP_LOGE(TAG, "Error: Cannot lift cutter disk");
         return ESP_FAIL;
     }
     ESP_LOGI(TAG, "Cutter disk rised correctly");
 
-
     sower_cmd_t cmd_cutter = {
         .code = SOWER_CMD_STOP_CUTTER,
         .arg = 0.0f,
     };
-    if (xQueueSend(g_esp32_uart_cmd_queue, &cmd_cutter, pdMS_TO_TICKS(100) != pdPASS))
+
+    if (xQueueSend(g_esp32_uart_transmit_data_queue, &cmd_cutter, pdMS_TO_TICKS(100)) != pdTRUE)
     {
         char msg[] = "Error: Cannot send stop cutter command";
         ESP_LOGE(TAG, "%s", msg);
@@ -264,7 +263,7 @@ esp_err_t state_machine_stop_event_handler(void)
         state_machine_set_error(msg);
         return ESP_FAIL;
     }
-    if (!state_machine_wait_for_sower_event(SOWER_EVENT_CUTTER_STOPPED, 500))
+    if (!state_machine_wait_for_sower_event(SOWER_EVENT_CUTTER_STOPPED, 10000))
     {
         ESP_LOGE(TAG, "Error: Cannot stop cutter disk");
         return ESP_FAIL;
@@ -323,7 +322,7 @@ esp_err_t state_machine_echo_esp32_event_handler()
         .arg = 0.0f,
     };
 
-    if (xQueueSend(g_esp32_uart_cmd_queue, &cmd_cutter, pdMS_TO_TICKS(100) != pdPASS))
+    if (xQueueSend(g_esp32_uart_transmit_data_queue, &cmd_cutter, pdMS_TO_TICKS(100) != pdPASS))
     {
         char msg[] = "Error: Cannot send echo sower command";
         ESP_LOGE(TAG, "%s", msg);
@@ -370,7 +369,7 @@ void state_machine_event_handler(void)
             break;
         case SM_CMD_ECHO_ESP32:
             ESP_LOGI(TAG, "CMD: Echo ESP32");
-            state_machine_echo_esp32_event_handler();
+            ESP_ERROR_CHECK(state_machine_echo_esp32_event_handler());
             break;
         default:
             ESP_LOGE(TAG, "CMD ERROR: Invalid message received");
@@ -381,11 +380,12 @@ void state_machine_event_handler(void)
 
 void state_machine_receive_waypoint_state(void)
 {
-    waypoint_state_e wp_state;
-    if (xQueueReceive(g_waypoint_status_queue, &wp_state, pdMS_TO_TICKS(10)) == pdPASS)
+    if (xQueueReceive(g_waypoint_status_queue, &g_wp_state, pdMS_TO_TICKS(10)) == pdPASS)
     {
-        const char *state = waypoint_state_to_string(wp_state);
+        const char *state = waypoint_state_to_string(g_wp_state);
         ESP_LOGI(TAG, "Waypoint State: %s", state);
+        if (g_wp_state == WP_TRJ_FINISHED)
+            ESP_ERROR_CHECK(state_machine_stop_event_handler());
     }
 }
 
@@ -415,7 +415,7 @@ static void state_machine_task(void *pvParameters)
         ESP_LOGE(TAG, "Error: Cannot get kalman cmd queue. Retrying...");
         vTaskDelay(pdMS_TO_TICKS(50));
     }
-    while (esp32_uart_get_transmit_data_queue(&g_esp32_uart_cmd_queue) != ESP_OK)
+    while (esp32_uart_get_transmit_data_queue(&g_esp32_uart_transmit_data_queue) != ESP_OK)
     {
         ESP_LOGE(TAG, "Error: Cannot get esp32_uart_transmit queue. Retrying...");
         vTaskDelay(pdMS_TO_TICKS(50));
@@ -434,7 +434,7 @@ static void state_machine_task(void *pvParameters)
     }
 
     /* Get sower state queue */
-    while (esp32_uart_get_received_data_queue(&g_esp32_uart_event_queue) != ESP_OK)
+    while (esp32_uart_get_received_data_queue(&g_esp32_uart_received_data_queue) != ESP_OK)
     {
         ESP_LOGE(TAG, "Error: Cannot get sower_event_queue. Retrying...");
         vTaskDelay(pdMS_TO_TICKS(50));

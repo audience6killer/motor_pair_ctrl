@@ -36,12 +36,12 @@ extern "C" void app_main(void)
 
     state_machine_task_start();
 
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    vTaskDelay(pdMS_TO_TICKS(500));
 
     esp32_uart_handshake();
 
-    vTaskDelay(pdMS_TO_TICKS(1000));
-    esp32_uart_handshake();
+    //vTaskDelay(pdMS_TO_TICKS(500));
+    //esp32_uart_handshake();
     // test_waypoint_follower_task_start();
     // seed_planter_control_start_task();
     // test_seed_planter_start_task();

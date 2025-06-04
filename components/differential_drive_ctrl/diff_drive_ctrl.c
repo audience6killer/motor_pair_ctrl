@@ -63,7 +63,7 @@ esp_err_t diff_drive_get_current_point(navigation_point_t *point)
 esp_err_t diff_drive_get_current_pose(kalman_info_t *pose)
 {
     *pose = g_vehicle_pose;
-    
+
     return ESP_OK;
 }
 
@@ -192,7 +192,7 @@ esp_err_t diff_drive_point_follower(kalman_info_t *c_pose)
     {
         g_diff_drive_state = DD_STATE_ORIENTING;
         ESP_ERROR_CHECK(diff_drive_orientation_control(ori_e));
-        //ESP_ERROR_CHECK(pid_reset_ctrl_block(diff_drive_handle->position_pid_ctrl));
+        // ESP_ERROR_CHECK(pid_reset_ctrl_block(diff_drive_handle->position_pid_ctrl));
     }
     else
     {
@@ -335,7 +335,7 @@ esp_err_t diff_drive_stop_event_handle(void)
 
 esp_err_t diff_drive_receive_point_event_handler(navigation_point_t point)
 {
-    //ESP_RETURN_ON_FALSE(point != NULL, ESP_ERR_INVALID_STATE, TAG, "Navigation point is null");
+    // ESP_RETURN_ON_FALSE(point != NULL, ESP_ERR_INVALID_STATE, TAG, "Navigation point is null");
 
     esp_err_t ret = diff_drive_set_navigation_point(point);
     if (ret != ESP_OK)
@@ -366,17 +366,9 @@ void diff_drive_cmd_handler(void)
 
         case DD_CMD_RECEIVE_POINT:
             ESP_LOGI(TAG, "Event: Point received");
-            if (cmd.point != NULL)
-            {
-                printf("Received navigation point: x=%.4f, y=%.4f, theta=%.4f\n", cmd.point->x, cmd.point->y, cmd.point->theta);
-                navigation_point_t point = *cmd.point;
-                diff_drive_receive_point_event_handler(point);
-            }
-            else 
-            {
-                ESP_LOGE(TAG, "Event Error: Point received was NULL");
-                break;
-            }
+            printf("Received navigation point: x=%.4f, y=%.4f, theta=%.4f\n", cmd.point.x, cmd.point.y, cmd.point.theta);
+            navigation_point_t point = cmd.point;
+            diff_drive_receive_point_event_handler(point);
             break;
 
         default:

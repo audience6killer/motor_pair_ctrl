@@ -91,13 +91,26 @@ esp_err_t esp32_uart_handshake(void)
         .arg = 0.0f,
     };
 
-    if( xQueueSend(g_esp32_transmit_data_queue, &echo_sower, pdMS_TO_TICKS(100)) != pdPASS)
+    if (xQueueSend(g_esp32_transmit_data_queue, &echo_sower, pdMS_TO_TICKS(100)) != pdPASS)
     {
         ESP_LOGE(TAG, "Error: Failed to send echo msg to queue");
         return ESP_FAIL;
     }
 
-    ESP_LOGI(TAG, "Finished executing handshake!");
+    sower_event_t response;
+    if (xQueueReceive(g_esp32_received_data_queue, &response, pdMS_TO_TICKS(1000)) != pdTRUE)
+    {
+        ESP_LOGE(TAG, "Error: Response receiver Timeout");
+        return ESP_FAIL;
+    }
+
+    if (response.event == SOWER_EVENT_ECHO_MSG)
+        ESP_LOGI(TAG, "Handshake successful!");
+    else
+    {
+        ESP_LOGE(TAG, "Handshake failed!");
+        return ESP_FAIL;
+    }
 
     return ESP_OK;
 }
@@ -111,7 +124,6 @@ static void esp32_uart_receive_task(void *pvParameters)
         sower_event_t cutter_event;
         if (xQueueReceive(communication_esp32_queue, (void *)&event_uart_rx, pdMS_TO_TICKS(100)) == pdTRUE)
         {
-
             switch (event_uart_rx.type)
             {
             case UART_DATA:
@@ -119,12 +131,12 @@ static void esp32_uart_receive_task(void *pvParameters)
                 uart_read_bytes(ESP32_UART_PORT, (uint8_t *)&cutter_event, event_uart_rx.size, pdMS_TO_TICKS(100));
 
                 const char *event_name = sower_event_name(cutter_event.event);
-                ESP_LOGI(TAG, "Received cutter_event: %s, error=%d", event_name, cutter_event.error);
+                ESP_LOGI(TAG, "Received sower event: %s, error=%d", event_name, cutter_event.error);
 
                 // send queue
-                if (xQueueSend(g_esp32_received_data_queue, &cutter_event, pdMS_TO_TICKS(100)) == pdFAIL)
+                if (xQueueSend(g_esp32_received_data_queue, &cutter_event, pdMS_TO_TICKS(100)) != pdTRUE)
                 {
-                    // ESP_LOGE(TAG, "Error sending data to queue");
+                    ESP_LOGE(TAG, "Error sending data to queue");
                 }
 
                 // Clean input.
@@ -171,7 +183,9 @@ static void esp32_uart_transmit_task(void *pvParameters)
                           &cmd,
                           pdMS_TO_TICKS(500)) == pdPASS)
         {
-            if(esp32_send_frame_to_sower((const sower_cmd_t)cmd) != ESP_OK)
+            const char *cmd_name = sower_cmd_name(cmd.code);
+            printf("Event to send to sower: %s, %f\n", cmd_name, cmd.arg);
+            if (esp32_send_frame_to_sower((const sower_cmd_t)cmd) != ESP_OK)
             {
                 ESP_LOGE(TAG, "Error: Failed to send serialized data");
             }
@@ -215,7 +229,7 @@ void esp32_uart_task_start(void)
 
     ESP_ERROR_CHECK(esp32_uart_task_init());
 
-    g_esp32_transmit_data_queue = xQueueCreate(5, sizeof(sower_cmd_t));
+    g_esp32_transmit_data_queue = xQueueCreate(10, sizeof(sower_cmd_t));
     g_esp32_received_data_queue = xQueueCreate(5, sizeof(sower_event_t));
 
     // Creates RF task to receive information.

@@ -99,7 +99,7 @@ void waypoint_trajectory_ctrl(void *args)
 
             diff_drive_cmd_t point_cmd = {
                 .cmd = DD_CMD_RECEIVE_POINT,
-                .point = &point,
+                .point = point,
             };
 
             xQueueSendFromISR(g_diff_drive_cmd_queue, &point_cmd, NULL);
@@ -115,7 +115,6 @@ void waypoint_trajectory_ctrl(void *args)
             waypoint_state_e state = g_waypoint_state;
             diff_drive_cmd_t point_cmd = {
                 .cmd = DD_CMD_STOP,
-                .point = NULL,
             };
             xQueueSendFromISR(g_diff_drive_cmd_queue, &point_cmd, NULL);
 
@@ -164,7 +163,6 @@ esp_err_t waypoint_start_event_handler(void)
     /* Start diff drive */
     diff_drive_cmd_t cmd = {
         .cmd = DD_CMD_START,
-        .point = NULL,
     };
 
     if (xQueueSend(g_diff_drive_cmd_queue, &cmd, pdMS_TO_TICKS(100)) != pdPASS)
@@ -177,16 +175,11 @@ esp_err_t waypoint_start_event_handler(void)
 
     /* Send first point */
     navigation_point_t point = g_navigation_points.front();
-    navigation_point_t point2 = (navigation_point_t){
-        .x = g_navigation_points.front().x,
-        .y = g_navigation_points.front().y,
-        .theta = g_navigation_points.front().theta,
-    };
     g_navigation_points.pop();
 
     diff_drive_cmd_t point_cmd = {
         .cmd = DD_CMD_RECEIVE_POINT,
-        .point = &point,
+        .point = point,
     };
 
     if (xQueueSend(g_diff_drive_cmd_queue, &point_cmd, pdMS_TO_TICKS(100)) != pdPASS)
@@ -226,7 +219,6 @@ esp_err_t waypoint_stop_event_handler(void)
 
     diff_drive_cmd_t cmd = {
         .cmd = DD_CMD_STOP,
-        .point = NULL,
     };
 
     if (xQueueSend(g_diff_drive_cmd_queue, &cmd, pdMS_TO_TICKS(100)) != pdPASS)

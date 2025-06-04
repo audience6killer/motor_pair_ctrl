@@ -104,6 +104,31 @@ static inline const char* sower_event_name(sower_events_e event)
     }
 }
 
+/**
+ * @brief Get the string name of a sower_cmd_e value.
+ *
+ * @param cmd The sower_cmd_e value.
+ * @return const char* The name of the command.
+ */
+static inline const char* sower_cmd_name(sower_cmd_e cmd)
+{
+    switch (cmd)
+    {
+        case SOWER_CMD_EMPTY:            return "SOWER_CMD_EMPTY";
+        case SOWER_CMD_STOP_CUTTER:      return "SOWER_CMD_STOP_CUTTER";
+        case SOWER_CMD_START_CUTTER:     return "SOWER_CMD_START_CUTTER";
+        case SOWER_CMD_DISTANCE:         return "SOWER_CMD_DISTANCE";
+        case SOWER_CMD_RPMS:             return "SOWER_CMD_RPMS";
+        case SOWER_CMD_LINEAR_MOTOR_UP:  return "SOWER_CMD_LINEAR_MOTOR_UP";
+        case SOWER_CMD_LINEAR_MOTOR_DOWN:return "SOWER_CMD_LINEAR_MOTOR_DOWN";
+        case SOWER_CMD_START_DISPENSER:  return "SOWER_CMD_START_DISPENSER";
+        case SOWER_CMD_STOP_DISPENSER:   return "SOWER_CMD_STOP_DISPENSER";
+        case SOWER_CMD_ECHO_SOWER:       return "SOWER_CMD_ECHO_SOWER";
+        case SOWER_CMD_ERROR:            return "SOWER_CMD_ERROR";
+        default:                         return "UNKNOWN_CMD";
+    }
+}
+
 esp_err_t esp32_uart_handshake(void);
 
 esp_err_t esp32_uart_get_transmit_data_queue(QueueHandle_t *handle);
