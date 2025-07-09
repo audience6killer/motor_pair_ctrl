@@ -51,8 +51,8 @@ esp_err_t data_center_send2queue(data_center_msg_t *msg)
 esp_err_t data_center_send_vehicle_data(char *msg)
 {
     ESP_RETURN_ON_FALSE(msg != NULL, ESP_ERR_INVALID_STATE, TAG, "Trying to send null msg to lora!");
-    
-    if(xQueueSend(g_lora_transmit_data_queue, msg, pdMS_TO_TICKS(100)) != pdPASS)
+
+    if (xQueueSend(g_lora_transmit_data_queue, msg, pdMS_TO_TICKS(100)) != pdPASS)
     {
         ESP_LOGE(TAG, "Error sendig vehicle data to queue");
         return ESP_FAIL;
@@ -64,13 +64,14 @@ esp_err_t data_center_send_vehicle_data(char *msg)
 /* Colect data while */
 void data_center_recolect_data(char *msg)
 {
-    // Clear the json document 
+    ESP_LOGI(TAG, "Recolecting data to send to lora");
+    // Clear the json document
     json.clear();
 
-    /* Get waypoint data */ 
+    /* Get waypoint data */
     json["wp"]["st"] = waypoint_get_state_string();
     json["wp"]["no_p"] = waypoint_get_point_number();
-    
+
     /* Get diff drive data */
     json["dd"]["st"] = diff_drive_get_state_string();
     navigation_point_t current_point;
@@ -92,13 +93,12 @@ void data_center_recolect_data(char *msg)
 
     /* Get state machine */
     json["sm"]["st"] = state_machine_get_state_string();
-    if(strcmp("SM_STATE_ERROR", json["sm"]["st"]) == 0)
+    if (strcmp("SM_STATE_ERROR", json["sm"]["st"]) == 0)
         json["sm"]["er"] = state_machine_get_error_string();
 
     serializeJson(json, msg, 200);
     strcat(msg, "\n");
-    //printf("%s\n", msg);
-    
+    // printf("%s\n", msg);
 }
 
 /**
@@ -172,7 +172,6 @@ esp_err_t data_center_parse_data(char *data, data_center_msg_t *msg)
     {
         msg->code = SM_CMD_ECHO_ESP32;
         ESP_LOGI(TAG, "Command received: ECHO ESP32");
-
     }
     else
     {
@@ -183,19 +182,22 @@ esp_err_t data_center_parse_data(char *data, data_center_msg_t *msg)
     return ESP_OK;
 }
 
-
 esp_err_t data_center_receive_lora_data(void)
 {
     char received_data[200];
     data_center_msg_t msg;
-    //memset(received_data, 0, 200);
-
+    // memset(received_data, 0, 200);
 
     if (xQueueReceive(g_lora_received_data_queue, received_data, pdMS_TO_TICKS(100)) == pdPASS)
     {
-        //printf("DATA_CENTER: %s\n", received_data);
-        data_center_parse_data(received_data, &msg);
-        ESP_ERROR_CHECK(data_center_send2queue(&msg));
+        // printf("DATA_CENTER: %s\n", received_data);
+        if (data_center_parse_data(received_data, &msg) == ESP_OK)
+            ESP_ERROR_CHECK(data_center_send2queue(&msg));
+        else
+        {
+            ESP_LOGE(TAG, "Error: Data received from LoRa invalid");
+            return ESP_FAIL;
+        }
     }
 
     return ESP_OK;
@@ -203,7 +205,7 @@ esp_err_t data_center_receive_lora_data(void)
 
 esp_err_t data_center_send_lora_data(void)
 {
-    if(lora_is_available())
+    if (lora_is_available())
     {
         char msg[200];
         data_center_recolect_data(msg);
@@ -219,12 +221,12 @@ static void data_center_task(void *args)
 
     g_data_center_data_queue = xQueueCreate(5, sizeof(data_center_msg_t));
 
-    while(lora_get_received_data_queue(&g_lora_received_data_queue))
+    while (lora_get_received_data_queue(&g_lora_received_data_queue))
     {
         ESP_LOGE(TAG, "Cannot get the lora_received_data_queue. Retrying...");
         vTaskDelay(pdMS_TO_TICKS(100));
     }
-    while(lora_get_transmit_data_queue(&g_lora_transmit_data_queue))
+    while (lora_get_transmit_data_queue(&g_lora_transmit_data_queue))
     {
         ESP_LOGE(TAG, "Cannot get the lora_transmit_data_queue. Retrying...");
         vTaskDelay(pdMS_TO_TICKS(100));
@@ -233,8 +235,8 @@ static void data_center_task(void *args)
     for (;;)
     {
         data_center_receive_lora_data();
-        //data_center_send_lora_data();
-        
+        // data_center_send_lora_data();
+
         vTaskDelay(pdMS_TO_TICKS(100));
     }
 }

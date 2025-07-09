@@ -1,7 +1,6 @@
 extern "C"
 {
 #include "traction_control.h"
-// #include "test_traction_control.h"
 #include "kalman_filter.h"
 #include "odometry_unit.h"
 #include "diff_drive_ctrl.h"
@@ -22,8 +21,6 @@ extern "C" void app_main(void)
 {
     initArduino();
 
-    //Serial.begin(115200);
-
     tract_ctrl_start_task();
     odometry_start_task();
     kalman_filter_start_task();
@@ -32,19 +29,11 @@ extern "C" void app_main(void)
     data_center_task_start();
     lora_task_start();
     esp32_uart_task_start();
-    // fake_data_center_task_start();
 
     state_machine_task_start();
 
-    vTaskDelay(pdMS_TO_TICKS(500));
-
-    esp32_uart_handshake();
-
-    //vTaskDelay(pdMS_TO_TICKS(500));
-    //esp32_uart_handshake();
-    // test_waypoint_follower_task_start();
-    // seed_planter_control_start_task();
-    // test_seed_planter_start_task();
+    // vTaskDelay(pdMS_TO_TICKS(500));
+    // esp32_uart_handshake();
 
     for (;;)
     {

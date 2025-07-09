@@ -22,19 +22,19 @@
 
 #define TRACT_MR_PWMA                        33
 #define TRACT_MR_PWMB                        32
-#define TRACT_MR_ENCODER_A                   34
-#define TRACT_MR_ENCODER_B                   35
+#define TRACT_MR_ENCODER_A                   35
+#define TRACT_MR_ENCODER_B                   34
 
 #define MOTOR1_ENCODER_RES                  908
 #define MOTOR2_ENCODER_RES                  908
 
 #define TRACT_ML_KP                         0.50f
-#define TRACT_ML_KI                         0.10f
-#define TRACT_ML_KD                         0.50f
+#define TRACT_ML_KI                         0.05f
+#define TRACT_ML_KD                         0.20f
 
-#define TRACT_MR_KP                         0.50f
-#define TRACT_MR_KI                         0.10f
-#define TRACT_MR_KD                         0.50f
+#define TRACT_MR_KP                         0.30f
+#define TRACT_MR_KI                         0.15f
+#define TRACT_MR_KD                         0.30f
 
 // #define MOTOR_LEFT_KP                       1.00f
 // #define MOTOR_LEFT_KI                       0.54f

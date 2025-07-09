@@ -11,8 +11,8 @@
 #define RF_UART_BUFFER_SIZE         256
 #define RF_UART_QUEUE_SIZE          5
 #define RF_UART_PORT                UART_NUM_2
-#define RF_UART_TX_PIN              GPIO_NUM_17
-#define RF_UART_RX_PIN              GPIO_NUM_16
+#define RF_UART_TX_PIN              GPIO_NUM_16
+#define RF_UART_RX_PIN              GPIO_NUM_17
 #define RF_AUX_PIN                  GPIO_NUM_23
 #define RF_UART_RTS_PIN             UART_PIN_NO_CHANGE
 #define RF_UART_CTS_PIN             UART_PIN_NO_CHANGE

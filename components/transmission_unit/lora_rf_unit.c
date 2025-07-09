@@ -63,9 +63,11 @@ static void lora_transmit_task(void *pvParameters)
     {
         if (xQueueReceive(g_lora_transmit_data_queue, received_data, pdMS_TO_TICKS(WAIT_QUEUE_SEND_RF)) == pdPASS)
         {
-            // printf("%s\n", received_data);
+            printf("%s\n", received_data);
             // Writes information to the UART port
-            uart_write_bytes(RF_UART_PORT, received_data, strlen(received_data));
+            int len = uart_write_bytes(RF_UART_PORT, received_data, strlen(received_data));
+
+            printf("Bytes sended: %d\n", len);
 
             // Cleans result.
             memset(received_data, 0, sizeof(received_data));

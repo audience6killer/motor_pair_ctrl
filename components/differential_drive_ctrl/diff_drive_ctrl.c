@@ -167,10 +167,10 @@ esp_err_t diff_drive_point_follower(kalman_info_t *c_pose)
     float dist_error = g_diff_drive_error.err_dist;
     float ori_e = g_diff_drive_error.err_ori;
 
-    // printf("theta_error:%f,d_error:%f,ori_e:%f*/\r\n", theta_error, dist_error, ori_e);
+    printf("theta_error:%f,d_error:%f,ori_e:%f*/\n", theta_error, dist_error, ori_e);
     // printf("%.4f\n", dist_error);
 
-#if true
+#if false 
     printf("/*x,%.4f,xd,%.4f,y,%.4f,yd,%.4f,theta,%.4f,thetad,%.4f,dist_error,%.4f,theta_err,%.4f,ori_error,%.4f*/\n", c_pose->x, g_current_point.x, c_pose->y, g_current_point.y, c_pose->theta, g_current_point.theta, dist_error, theta_error, ori_e);
 #endif
 

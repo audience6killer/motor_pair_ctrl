@@ -102,7 +102,7 @@ esp_err_t state_machine_start_event_handler(void)
         return ESP_FAIL;
     }
 
-    if (!state_machine_wait_for_sower_event(SOWER_EVENT_CUTTER_STARTED, 1000))
+    if (!state_machine_wait_for_sower_event(SOWER_EVENT_CUTTER_STARTED, 20000))
     {
         ESP_LOGE(TAG, "Error: Cannot start cutter disk");
         return ESP_FAIL;
@@ -123,12 +123,31 @@ esp_err_t state_machine_start_event_handler(void)
         return ESP_FAIL;
     }
 
-    if (!state_machine_wait_for_sower_event(SOWER_EVENT_CUTTER_DOWN, 200))
+    if (!state_machine_wait_for_sower_event(SOWER_EVENT_CUTTER_DOWN, 6000))
     {
         ESP_LOGE(TAG, "Error: Cannot descend cutter disk");
         return ESP_FAIL;
     }
     ESP_LOGI(TAG, "Cutter disk descended correctly");
+
+    /* Start seed dispenser */
+    sower_cmd_e cmd_dispenser_start = SOWER_CMD_START_DISPENSER;
+
+    if (xQueueSend(g_esp32_uart_transmit_data_queue, &cmd_dispenser_start, pdMS_TO_TICKS(1000)) != pdTRUE)
+    {
+        char msg[] = "Error: Cannot send start seed dispenser";
+        ESP_LOGE(TAG, "%s", msg);
+
+        state_machine_set_error(msg);
+        return ESP_FAIL;
+    }
+
+    if (!state_machine_wait_for_sower_event(SOWER_EVENT_DISPENSER_STARTED, 200))
+    {
+        ESP_LOGE(TAG, "Error: Cannot start seed dispenser");
+        return ESP_FAIL;
+    }
+    ESP_LOGI(TAG, "Seed dispenser started correctly");
 
     /* Start waypoint trajectory */
     waypoint_cmd_t cmd_start = {
@@ -204,11 +223,11 @@ esp_err_t state_machine_stop_event_handler(void)
         .point = NULL,
     };
     EventBits_t wp_status_flag = xEventGroupWaitBits(g_waypoint_event_group, WP_STOPPED | WP_ERROR, pdTRUE, pdFALSE, pdMS_TO_TICKS(50));
-    
+
     /* Skip WP_CMD_STOP_TRAJ if trajectory already ended */
-    if(g_wp_state == WP_TRJ_FINISHED)
+    if (g_wp_state == WP_TRJ_FINISHED)
         goto wp_finished;
-    
+
     if (xQueueSend(g_waypoint_cmd_queue, &cmd_stop, pdMS_TO_TICKS(100)) != pdPASS)
     {
         ESP_LOGE(TAG, "Error: Cannot send stop trajectory command to waypoint task");
@@ -229,6 +248,23 @@ esp_err_t state_machine_stop_event_handler(void)
     }
 
 wp_finished:
+    /* Stop seed dispenser */
+    sower_cmd_e cmd_dispenser_stop = SOWER_CMD_STOP_DISPENSER;
+    if (xQueueSend(g_esp32_uart_transmit_data_queue, &cmd_dispenser_stop, pdMS_TO_TICKS(1000)) != pdTRUE)
+    {
+        char msg[] = "Error: Cannot send stop seed dispenser";
+        ESP_LOGE(TAG, "%s", msg);
+
+        state_machine_set_error(msg);
+        return ESP_FAIL;
+    }
+    if (!state_machine_wait_for_sower_event(SOWER_EVENT_DISPENSER_STOPPED, 1000))
+    {
+        ESP_LOGE(TAG, "Error: Cannot stop seed dispenser");
+        return ESP_FAIL;
+    }
+    ESP_LOGI(TAG, "Seed dispenser stopped correctly");
+
     /* Stop and lift the cutter */
     sower_cmd_t cmd_linear_motor = {
         .code = SOWER_CMD_LINEAR_MOTOR_UP,
@@ -243,9 +279,9 @@ wp_finished:
         return ESP_FAIL;
     }
 
-    if (!state_machine_wait_for_sower_event(SOWER_EVENT_CUTTER_UP, 1000))
+    if (!state_machine_wait_for_sower_event(SOWER_EVENT_CUTTER_UP, 30000))
     {
-        ESP_LOGE(TAG, "Error: Cannot lift cutter disk");
+        ESP_LOGE(TAG, "Error: Timeout waiting for cutter disk to be lifted");
         return ESP_FAIL;
     }
     ESP_LOGI(TAG, "Cutter disk rised correctly");
@@ -312,6 +348,7 @@ esp_err_t state_machine_nav_point_event_handler(float x, float y, float theta)
 
 esp_err_t state_machine_echo_event_handler(void)
 {
+
     return ESP_OK;
 }
 
@@ -442,6 +479,14 @@ static void state_machine_task(void *pvParameters)
 
     /* Initialize error string */
     memset(g_error_string, 0, sizeof(g_error_string));
+
+    /* Test esp32 uart comm */
+    ESP_LOGI(TAG, "Testing esp32_uart_comm");
+    while (esp32_uart_handshake() != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Error: Retrying uart handshake");
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
 
     for (;;)
     {

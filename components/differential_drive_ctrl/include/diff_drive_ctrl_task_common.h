@@ -7,9 +7,9 @@
 #define DIFF_DRIVE_TASK_PRIORITY       20 
 
 /* Originales */
-#define DIFF_DRIVE_POS_KP               0.9f
-#define DIFF_DRIVE_POS_KI               0.1f
-#define DIFF_DRIVE_POS_KD               0.5f
+#define DIFF_DRIVE_POS_KP               0.8f
+#define DIFF_DRIVE_POS_KI               0.2f
+#define DIFF_DRIVE_POS_KD               0.1f
 
 #define DIFF_DRIVE_ORI_KP               8.9f
 #define DIFF_DRIVE_ORI_KI               2.0f
