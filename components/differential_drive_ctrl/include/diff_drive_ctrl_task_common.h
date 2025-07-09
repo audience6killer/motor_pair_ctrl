@@ -7,9 +7,9 @@
 #define DIFF_DRIVE_TASK_PRIORITY       20 
 
 /* Originales */
-#define DIFF_DRIVE_POS_KP               0.8f
-#define DIFF_DRIVE_POS_KI               0.2f
-#define DIFF_DRIVE_POS_KD               0.1f
+#define DIFF_DRIVE_POS_KP               0.9f
+#define DIFF_DRIVE_POS_KI               0.1f
+#define DIFF_DRIVE_POS_KD               0.5f
 
 #define DIFF_DRIVE_ORI_KP               8.9f
 #define DIFF_DRIVE_ORI_KI               2.0f
@@ -33,7 +33,7 @@
 #define V_MAX_RADS                     2.925f   
 // #define V_MAX_RADS                     0.2f   
 #define WHEEL_RADIUS                   0.2046f
-#define DISTANCE_TH                    0.20f        // 20 cm
+#define DISTANCE_TH                    0.15f        // 20 cm
 
 #define ORIENTATION_TH                 0.08726646 // 5°
 #define RADS2REVS(b) (b * 0.1592f)
