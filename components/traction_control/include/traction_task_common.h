@@ -17,8 +17,8 @@
 
 #define TRACT_ML_PWMA                       27
 #define TRACT_ML_PWMB                       14
-#define TRACT_ML_ENCODER_A                  25
-#define TRACT_ML_ENCODER_B                  26
+#define TRACT_ML_ENCODER_A                  26
+#define TRACT_ML_ENCODER_B                  25
 
 #define TRACT_MR_PWMA                        33
 #define TRACT_MR_PWMB                        32
@@ -28,6 +28,14 @@
 #define MOTOR1_ENCODER_RES                  908
 #define MOTOR2_ENCODER_RES                  908
 
+// #define TRACT_ML_KP                         4.50f
+// #define TRACT_ML_KI                         0.35f
+// #define TRACT_ML_KD                         0.20f
+// 
+// #define TRACT_MR_KP                         4.50f
+// #define TRACT_MR_KI                         0.35f
+// #define TRACT_MR_KD                         0.30f
+
 #define TRACT_ML_KP                         0.50f
 #define TRACT_ML_KI                         0.05f
 #define TRACT_ML_KD                         0.20f
@@ -35,15 +43,6 @@
 #define TRACT_MR_KP                         0.30f
 #define TRACT_MR_KI                         0.15f
 #define TRACT_MR_KD                         0.30f
-
-// #define MOTOR_LEFT_KP                       1.00f
-// #define MOTOR_LEFT_KI                       0.54f
-// #define MOTOR_LEFT_KD                       0.7f
-// 
-// #define MOTOR_RIGHT_KP                      0.70f
-// #define MOTOR_RIGHT_KI                      0.30f
-// #define MOTOR_RIGHT_KD                      0.20f
-
 /* Originales */
 //#define TRACT_ML_KP                         0.65f
 //#define TRACT_ML_KI                         0.54f

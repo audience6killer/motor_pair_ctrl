@@ -88,6 +88,7 @@ esp_err_t state_machine_start_event_handler(void)
     }
 
     /* Start cutter disk */
+    /*
     ESP_LOGI(TAG, "Starting cutter disk");
     sower_cmd_t cmd_cutter = {
         .code = SOWER_CMD_START_CUTTER,
@@ -129,8 +130,9 @@ esp_err_t state_machine_start_event_handler(void)
         return ESP_FAIL;
     }
     ESP_LOGI(TAG, "Cutter disk descended correctly");
-
+    */
     /* Start seed dispenser */
+    /*
     sower_cmd_e cmd_dispenser_start = SOWER_CMD_START_DISPENSER;
 
     if (xQueueSend(g_esp32_uart_transmit_data_queue, &cmd_dispenser_start, pdMS_TO_TICKS(1000)) != pdTRUE)
@@ -148,7 +150,7 @@ esp_err_t state_machine_start_event_handler(void)
         return ESP_FAIL;
     }
     ESP_LOGI(TAG, "Seed dispenser started correctly");
-
+    */
     /* Start waypoint trajectory */
     waypoint_cmd_t cmd_start = {
         .cmd = WP_CMD_START_TRAJ,
@@ -359,7 +361,7 @@ esp_err_t state_machine_echo_esp32_event_handler()
         .arg = 0.0f,
     };
 
-    if (xQueueSend(g_esp32_uart_transmit_data_queue, &cmd_cutter, pdMS_TO_TICKS(100) != pdPASS))
+    if (xQueueSend(g_esp32_uart_transmit_data_queue, &cmd_cutter, pdMS_TO_TICKS(100)) != pdTRUE)
     {
         char msg[] = "Error: Cannot send echo sower command";
         ESP_LOGE(TAG, "%s", msg);
@@ -374,6 +376,31 @@ esp_err_t state_machine_echo_esp32_event_handler()
     }
 
     ESP_LOGI(TAG, "Sower module says HELLOWWW!");
+    return ESP_OK;
+}
+
+esp_err_t state_machine_reset_cutter_event_handler(void)
+{
+    sower_cmd_t cmd_cutter = {
+        .code = SOWER_CMD_RESET_CUTTER,
+        .arg = 0.0f,
+    };
+    if (xQueueSend(g_esp32_uart_transmit_data_queue, &cmd_cutter, pdMS_TO_TICKS(100)) != pdTRUE)
+    {
+        char msg[] = "Error: Cannot send restart cutter command";
+        ESP_LOGE(TAG, "%s", msg);
+
+        state_machine_set_error(msg);
+        return ESP_FAIL;
+    }
+    if (!state_machine_wait_for_sower_event(SOWER_EVENT_CUTTER_RESTARTED, 20000))
+    {
+        ESP_LOGE(TAG, "Error: Cannot comm with sower module");
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "Cutter restarted successfully!");
+
     return ESP_OK;
 }
 
@@ -403,6 +430,10 @@ void state_machine_event_handler(void)
         case SM_CMD_ECHO:
             ESP_LOGI(TAG, "CMD: Echo");
             ESP_ERROR_CHECK(state_machine_echo_event_handler());
+            break;
+        case SM_CMD_RESET_CUTTER:
+            ESP_LOGI(TAG, "CMD: Reset cutter");
+            ESP_ERROR_CHECK(state_machine_reset_cutter_event_handler());
             break;
         case SM_CMD_ECHO_ESP32:
             ESP_LOGI(TAG, "CMD: Echo ESP32");

@@ -26,14 +26,19 @@
 /* Mejores */
 
 // Velocidad lineal de crucero = 0.5m/s = 0.388rev/s = 2.437rad/s
-#define V_COMM                         2.437f 
+// #define V_COMM                         2.437f 
+// Velocidad lineal de crucero = 0.2m/s = 0.388rev/s = 0.974rad/s
+#define V_COMM                           0.974f 
 //#define V_COMM                         0.2f 
 /* Original */
 // Velocidad lineal maxima = 0.6m/s = 0.465rev/s = 2.91rad/s
-#define V_MAX_RADS                     2.925f   
+// #define V_MAX_RADS                     2.925f   
+// Velocidad lineal maxima = 0.25m/s = 1.21rad/s
+#define V_MAX_RADS                      1.2185f   
+
 // #define V_MAX_RADS                     0.2f   
 #define WHEEL_RADIUS                   0.2046f
-#define DISTANCE_TH                    0.15f        // 20 cm
+#define DISTANCE_TH                    0.10f        // 20 cm
 
 #define ORIENTATION_TH                 0.08726646 // 5°
 #define RADS2REVS(b) (b * 0.1592f)

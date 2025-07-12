@@ -173,6 +173,11 @@ esp_err_t data_center_parse_data(char *data, data_center_msg_t *msg)
         msg->code = SM_CMD_ECHO_ESP32;
         ESP_LOGI(TAG, "Command received: ECHO ESP32");
     }
+    else if (strcmp(code, "RSC") == 0) // SM_CMD_ECHO_ESP32
+    {
+        msg->code = SM_CMD_RESET_CUTTER;
+        ESP_LOGI(TAG, "Command received: RESTART CUTTER");
+    }
     else
     {
         msg->code = SM_CMD_EMPTY;

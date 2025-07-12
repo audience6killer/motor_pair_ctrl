@@ -51,7 +51,7 @@ motor_pair_state_e tract_ctrl_get_current_state(void)
 {
     return g_traction_state;
 }
-const char* tract_ctrl_get_state_string(void)
+const char *tract_ctrl_get_state_string(void)
 {
     return motor_pair_state_to_string(g_traction_state);
 }
@@ -97,8 +97,7 @@ static bool IRAM_ATTR traction_pid_isr_cb(gptimer_handle_t timer, const gptimer_
         .mright_pulses = motor_right_real_pulses,
         .state = g_traction_state,
         .mleft_set_point = 0.0f,
-        .mright_set_point = 0.0f
-    };
+        .mright_set_point = 0.0f};
 
     // Send data to the queue (use ISR-safe function)
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
@@ -213,7 +212,7 @@ esp_err_t tract_ctrl_set_speed_event_handler(float *mleft_speed_pv, float *mrigh
         int mleft_int = roundf(TRACT_CONV_REV2PULSES(mleft_abs));
         int mright_int = roundf(TRACT_CONV_REV2PULSES(mright_abs));
         // printf("m_lefta, %f, m_righta, %f, left_int:%d, right_int:%d   ", mleft_abs, mright_abs, mleft_int, mright_int);
-        if(mleft_int > 0 && mright_int > 0)
+        if (mleft_int > 0 && mright_int > 0)
             motor_pair_set_speed(mleft_int, mright_int, g_traction_handle);
     }
     else
@@ -492,7 +491,7 @@ static void tract_speed_update_task(void *pvParameters)
             // Send data to the queue
             tract_ctrl_send2data_queue(&traction_data);
 
-            // printf("/*%d,%d,%d,%d,%.4f,%.4f,%llu*/\n", traction_data.mleft_set_point, traction_data.mleft_pulses, traction_data.mright_set_point, traction_data.mright_pulses, motor_left_new_speed, motor_right_new_speed, time_diff / 1000);
+            //printf("/*%.2f,%.2f,%.2f,%.2f,%.4f,%.4f,%llu*/\n", TRACT_CONV_PULSES2REV(traction_data.mleft_set_point), TRACT_CONV_PULSES2REV(traction_data.mleft_pulses), TRACT_CONV_PULSES2REV(traction_data.mright_set_point), TRACT_CONV_PULSES2REV(traction_data.mright_pulses), TRACT_CONV_PULSES2REV(motor_left_new_speed), TRACT_CONV_PULSES2REV(motor_right_new_speed), time_diff / 1000);
         }
     }
 }
