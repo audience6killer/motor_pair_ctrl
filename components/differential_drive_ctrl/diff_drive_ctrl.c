@@ -12,6 +12,7 @@
 #include "kalman_filter.h"
 #include "traction_control.h"
 #include "pid_ctrl.h"
+#include "lora_rf_unit.h"
 
 #ifndef MIN
 #define MIN(X, Y) ((X) < (Y) ? (X) : (Y))
@@ -36,6 +37,7 @@ static QueueHandle_t g_diff_drive_cmd_queue = NULL;
 static diff_drive_ctrl_handle_t *diff_drive_handle = NULL;
 static QueueHandle_t g_traction_cmd_queue = NULL;
 static QueueHandle_t g_kalman_data_queue;
+static QueueHandle_t g_lora_unit_handle;
 
 static kalman_info_t g_vehicle_pose;
 static diff_drive_state_e g_diff_drive_state;
@@ -123,22 +125,24 @@ esp_err_t diff_drive_position_control(float theta_error)
 
     ESP_ERROR_CHECK(pid_compute(diff_drive_handle->position_pid_ctrl, theta_error, &wheel_angular_vel));
 
-    float phi_lp = V_COMM - wheel_angular_vel;
-    float phi_rp = V_COMM + wheel_angular_vel;
+    float phi = V_COMM + wheel_angular_vel;
+    // float phi_rp = V_COMM + wheel_angular_vel;
 
     // Check for angular velocity saturation
-    phi_lp = MIN(MAX(phi_lp, -V_MAX_RADS), V_MAX_RADS);
-    phi_rp = MIN(MAX(phi_rp, -V_MAX_RADS), V_MAX_RADS);
+    // phi_lp = MIN(MAX(phi_lp, -V_MAX_RADS), V_MAX_RADS);
+    // phi_rp = MIN(MAX(phi_rp, -V_MAX_RADS), V_MAX_RADS);
 
-    float left_speed = (float)RADS2REVS(phi_lp);
-    float right_speed = (float)RADS2REVS(phi_rp);
+    phi = MIN(MAX(phi, -V_MAX_RADS), V_MAX_RADS);
+    phi = fabs(phi);
+    //float phi = V_MAX_RADS;
+    float speed = (float)RADS2REVS(phi);
 
-    // printf("phi_lp: %f, phi_rp: %f, phi_lpp: %f, phi_rpp: %f\n", phi_lp, phi_rp, left_speed, right_speed);
+    // printf("phi: %f, phi_lpp: %f\n", phi, speed);
 
     tract_ctrl_cmd_t cmd = {
         .cmd = TRACT_CTRL_CMD_SET_SPEED,
-        .motor_left_speed = &left_speed,
-        .motor_right_speed = &right_speed,
+        .motor_left_speed = &speed,
+        .motor_right_speed = &speed,
     };
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(diff_drive_send2traction(cmd));
@@ -164,13 +168,20 @@ esp_err_t diff_drive_point_follower(kalman_info_t *c_pose)
     // Err_ori is the error between the desired final orientation and the current orientation
     g_diff_drive_error.err_ori = g_current_point.theta - c_pose->theta;
 
-    float dist_error = g_diff_drive_error.err_dist;
+    //float dist_error = g_diff_drive_error.err_dist;
+    float dist_error = g_diff_drive_error.err_x;
     float ori_e = g_diff_drive_error.err_ori;
 
     // printf("theta_error:%f,d_error:%f,ori_e:%f*/\n", theta_error, dist_error, ori_e);
     // printf("%.4f\n", dist_error);
 
-#if false 
+    char buffer[300];
+
+    // sprintf(buffer, sizeof(buffer), "/*x,%.4f,xd,%.4f,y,%.4f,yd,%.4f,theta,%.4f,thetad,%.4f,dist_error,%.4f,theta_err,%.4f,ori_error,%.4f*/\n", c_pose->x, g_current_point.x, c_pose->y, g_current_point.y, c_pose->theta, g_current_point.theta, dist_error, theta_error, ori_e);
+
+    // xQueueSend(g_lora_unit_handle, buffer, pdMS_TO_TICKS(100)); 
+
+#if true 
     printf("/*x,%.4f,xd,%.4f,y,%.4f,yd,%.4f,theta,%.4f,thetad,%.4f,dist_error,%.4f,theta_err,%.4f,ori_error,%.4f*/\n", c_pose->x, g_current_point.x, c_pose->y, g_current_point.y, c_pose->theta, g_current_point.theta, dist_error, theta_error, ori_e);
 #endif
 
@@ -457,6 +468,11 @@ static void diff_drive_ctrl_task(void *pvParameters)
     {
         ESP_LOGE(TAG, "Failed to get traction control queue. Retrying...");
         vTaskDelay(pdMS_TO_TICKS(20));
+    }
+    while(lora_get_transmit_data_queue(&g_lora_unit_handle) != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to get lora data queue. Retrying...");
+        vTaskDelay(pdMS_TO_TICKS(2000));
     }
 
     g_diff_drive_error = (diff_drive_err_t){

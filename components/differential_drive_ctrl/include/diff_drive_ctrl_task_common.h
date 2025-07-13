@@ -34,11 +34,11 @@
 // Velocidad lineal maxima = 0.6m/s = 0.465rev/s = 2.91rad/s
 // #define V_MAX_RADS                     2.925f   
 // Velocidad lineal maxima = 0.25m/s = 1.21rad/s
-#define V_MAX_RADS                      1.2185f   
+#define V_MAX_RADS                       2.925f   
 
 // #define V_MAX_RADS                     0.2f   
 #define WHEEL_RADIUS                   0.2046f
-#define DISTANCE_TH                    0.10f        // 20 cm
+#define DISTANCE_TH                    0.05f        // 20 cm
 
 #define ORIENTATION_TH                 0.08726646 // 5°
 #define RADS2REVS(b) (b * 0.1592f)
