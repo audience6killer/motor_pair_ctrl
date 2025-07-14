@@ -110,7 +110,8 @@ esp_err_t state_machine_start_event_handler(void)
     }
 
     ESP_LOGI(TAG, "Cutter disk started successfully");
-
+    */
+    /* Linear motors down */
     sower_cmd_t cmd_linear_motor = {
         .code = SOWER_CMD_LINEAR_MOTOR_DOWN,
         .arg = 0.0f,
@@ -130,9 +131,7 @@ esp_err_t state_machine_start_event_handler(void)
         return ESP_FAIL;
     }
     ESP_LOGI(TAG, "Cutter disk descended correctly");
-    */
     /* Start seed dispenser */
-    /*
     sower_cmd_e cmd_dispenser_start = SOWER_CMD_START_DISPENSER;
 
     if (xQueueSend(g_esp32_uart_transmit_data_queue, &cmd_dispenser_start, pdMS_TO_TICKS(1000)) != pdTRUE)
@@ -150,7 +149,6 @@ esp_err_t state_machine_start_event_handler(void)
         return ESP_FAIL;
     }
     ESP_LOGI(TAG, "Seed dispenser started correctly");
-    */
     /* Start waypoint trajectory */
     waypoint_cmd_t cmd_start = {
         .cmd = WP_CMD_START_TRAJ,
@@ -252,7 +250,7 @@ esp_err_t state_machine_stop_event_handler(void)
 wp_finished:
     /* Stop seed dispenser */
     sower_cmd_e cmd_dispenser_stop = SOWER_CMD_STOP_DISPENSER;
-    if (xQueueSend(g_esp32_uart_transmit_data_queue, &cmd_dispenser_stop, pdMS_TO_TICKS(1000)) != pdTRUE)
+    if (xQueueSend(g_esp32_uart_transmit_data_queue, &cmd_dispenser_stop, pdMS_TO_TICKS(500)) != pdTRUE)
     {
         char msg[] = "Error: Cannot send stop seed dispenser";
         ESP_LOGE(TAG, "%s", msg);
@@ -287,7 +285,7 @@ wp_finished:
         return ESP_FAIL;
     }
     ESP_LOGI(TAG, "Cutter disk rised correctly");
-
+    /*
     sower_cmd_t cmd_cutter = {
         .code = SOWER_CMD_STOP_CUTTER,
         .arg = 0.0f,
@@ -307,7 +305,7 @@ wp_finished:
         return ESP_FAIL;
     }
     ESP_LOGI(TAG, "Cutter disk stopped correctly");
-
+    */
     g_state_machine_state = SM_STATE_STOPPED;
     return ESP_OK;
 }
@@ -404,6 +402,92 @@ esp_err_t state_machine_reset_cutter_event_handler(void)
     return ESP_OK;
 }
 
+esp_err_t state_machine_return_to_origin_event_handler(void)
+{
+    navigation_point_t point = (navigation_point_t){
+        .x = 0.0f,
+        .y = 0.0f,
+        .theta = 0.0f,
+    };
+    waypoint_cmd_t origin = (waypoint_cmd_t){
+        .cmd = WP_CMD_RECEIVE_POINT,
+        .point = &point, 
+    };
+
+    if (xQueueSend(g_waypoint_cmd_queue, &origin, pdMS_TO_TICKS(100)) != pdTRUE)
+    {
+        char msg[] = "Error: Cannot send origin point command to waypoint task";
+        ESP_LOGE(TAG, "%s", msg);
+
+        state_machine_set_error(msg);
+        return ESP_FAIL;
+    }
+
+    /* Start waypoint trajectory */
+    waypoint_cmd_t cmd_start = {
+        .cmd = WP_CMD_START_TRAJ,
+        .point = NULL,
+    };
+    if (xQueueSend(g_waypoint_cmd_queue, &cmd_start, pdMS_TO_TICKS(100)) != pdTRUE)
+    {
+        char msg[] = "Error: Cannot send start trajectory command to waypoint task";
+        ESP_LOGE(TAG, "%s", msg);
+
+        state_machine_set_error(msg);
+        return ESP_FAIL;
+    }
+
+    EventBits_t wp_status_flag = xEventGroupWaitBits(g_waypoint_event_group, WP_NAVIGATING | WP_ERROR, pdTRUE, pdFALSE, pdMS_TO_TICKS(50));
+
+    if ((wp_status_flag & WP_NAVIGATING) != 0)
+    {
+        ESP_LOGI(TAG, "Waypoint trajectory start was successfull!");
+        g_is_running_traj = true;
+    }
+    else if ((wp_status_flag & WP_ERROR) != 0)
+    {
+        /*Error handling*/
+        ESP_LOGE(TAG, "Error: Cannot start trajectory");
+
+        EventBits_t error_flag = xEventGroupWaitBits(g_waypoint_error_group, WP_ERROR_EMPTY_NAV_POINTS | WP_ERROR_CANNOT_START_TRACT | WP_ERROR_CANNOT_SEND_FPOINT, pdTRUE, pdFALSE, pdMS_TO_TICKS(50));
+
+        if ((error_flag & WP_ERROR_EMPTY_NAV_POINTS) != 0)
+        {
+            char msg[] = "Error: the navigation points are empty";
+            ESP_LOGE(TAG, "%s", msg);
+            state_machine_set_error(msg);
+        }
+        else if ((error_flag & WP_ERROR_CANNOT_START_TRACT) != 0)
+        {
+            char msg[] = "Error: Cannot start tract";
+            ESP_LOGE(TAG, "%s", msg);
+            state_machine_set_error(msg);
+        }
+        else if ((error_flag & WP_ERROR_CANNOT_SEND_FPOINT) != 0)
+        {
+            char msg[] = "Error: Cannot send first point tp diff drive";
+            ESP_LOGE(TAG, "%s", msg);
+            state_machine_set_error(msg);
+        }
+        else
+        {
+            char msg[] = "Error: Cannot get error bits";
+            ESP_LOGE(TAG, "%s", msg);
+            state_machine_set_error(msg);
+        }
+    }
+    else
+    {
+        /* error handling */
+        char msg[] = "Error: Waypoint statuts bits were not received";
+        ESP_LOGE(TAG, "%s", msg);
+        state_machine_set_error(msg);
+    }
+
+    g_state_machine_state = SM_STATE_STARTED;
+    return ESP_OK;
+}
+
 void state_machine_event_handler(void)
 {
     data_center_msg_t data_center_msg;
@@ -431,13 +515,23 @@ void state_machine_event_handler(void)
             ESP_LOGI(TAG, "CMD: Echo");
             ESP_ERROR_CHECK(state_machine_echo_event_handler());
             break;
+        case SM_CMD_ECHO_ESP32:
+            ESP_LOGI(TAG, "CMD: Echo ESP32");
+            ESP_ERROR_CHECK(state_machine_echo_esp32_event_handler());
+            break;
         case SM_CMD_RESET_CUTTER:
             ESP_LOGI(TAG, "CMD: Reset cutter");
             ESP_ERROR_CHECK(state_machine_reset_cutter_event_handler());
             break;
-        case SM_CMD_ECHO_ESP32:
-            ESP_LOGI(TAG, "CMD: Echo ESP32");
-            ESP_ERROR_CHECK(state_machine_echo_esp32_event_handler());
+        case SM_CMD_STOP_DISPENSER:
+            ESP_LOGI(TAG, "CMD: Stop dispenser");
+            break;
+        case SM_CMD_GET_GPS_POS:
+            ESP_LOGI(TAG, "CMD: Get GPS pos");
+            break;
+        case SM_CMD_RETURN_TO_ORIGIN:
+            ESP_LOGI(TAG, "CMD: Return to Origin");
+            ESP_ERROR_CHECK(state_machine_return_to_origin_event_handler());
             break;
         default:
             ESP_LOGE(TAG, "CMD ERROR: Invalid message received");

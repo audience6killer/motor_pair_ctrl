@@ -9,17 +9,18 @@ extern "C"
     typedef enum
     {
         SM_CMD_EMPTY = 0,
-        SM_CMD_STOP_NAV,     // SPN
-        SM_CMD_START_NAV,    // STN
-        SM_CMD_PAUSE_NAV,    // PSN
-        SM_CMD_RESUME_NAV,   // RMN
-        SM_CMD_ADD_WAYPOINT, // NVP
-        SM_CMD_RESET,        // RST
-        SM_CMD_ECHO,         // ECH
-        SM_CMD_ECHO_ESP32,   // ECE
-        SM_CMD_RESET_CUTTER, // RSC
-        SM_CMD_STOP_DISPENSER,
-        SM_CMD_GET_GPS_POS,
+        SM_CMD_STOP_NAV,            // SPN
+        SM_CMD_START_NAV,           // STN
+        SM_CMD_PAUSE_NAV,           // PSN
+        SM_CMD_RESUME_NAV,          // RMN
+        SM_CMD_ADD_WAYPOINT,        // NVP
+        SM_CMD_RESET,               // RST
+        SM_CMD_ECHO,                // ECH
+        SM_CMD_ECHO_ESP32,          // ECE
+        SM_CMD_RESET_CUTTER,        // RSC
+        SM_CMD_STOP_DISPENSER,      // SSD      
+        SM_CMD_GET_GPS_POS,         // GPS
+        SM_CMD_RETURN_TO_ORIGIN,    // ORI
     } state_machine_cmd_e;   // Commands sended from the state machine
 
     typedef enum

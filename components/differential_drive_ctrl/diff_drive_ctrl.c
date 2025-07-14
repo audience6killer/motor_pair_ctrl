@@ -116,7 +116,7 @@ esp_err_t diff_drive_orientation_control(float theta_error)
     return ESP_OK;
 }
 
-esp_err_t diff_drive_position_control(float theta_error)
+esp_err_t diff_drive_position_control(float theta_error, bool is_forward)
 {
     ESP_RETURN_ON_FALSE(diff_drive_handle != NULL, ESP_ERR_INVALID_STATE, "TAG", "diff_drive_handle is null when calculating pos control");
 
@@ -128,14 +128,14 @@ esp_err_t diff_drive_position_control(float theta_error)
     float phi = V_COMM + wheel_angular_vel;
     // float phi_rp = V_COMM + wheel_angular_vel;
 
-    // Check for angular velocity saturation
-    // phi_lp = MIN(MAX(phi_lp, -V_MAX_RADS), V_MAX_RADS);
-    // phi_rp = MIN(MAX(phi_rp, -V_MAX_RADS), V_MAX_RADS);
-
     phi = MIN(MAX(phi, -V_MAX_RADS), V_MAX_RADS);
     phi = fabs(phi);
     //float phi = V_MAX_RADS;
     float speed = (float)RADS2REVS(phi);
+    
+    // Is returning to the origin
+    if(!is_forward)
+        speed = -speed;
 
     // printf("phi: %f, phi_lpp: %f\n", phi, speed);
 
@@ -175,37 +175,18 @@ esp_err_t diff_drive_point_follower(kalman_info_t *c_pose)
     // printf("theta_error:%f,d_error:%f,ori_e:%f*/\n", theta_error, dist_error, ori_e);
     // printf("%.4f\n", dist_error);
 
-    char buffer[300];
-
-    // sprintf(buffer, sizeof(buffer), "/*x,%.4f,xd,%.4f,y,%.4f,yd,%.4f,theta,%.4f,thetad,%.4f,dist_error,%.4f,theta_err,%.4f,ori_error,%.4f*/\n", c_pose->x, g_current_point.x, c_pose->y, g_current_point.y, c_pose->theta, g_current_point.theta, dist_error, theta_error, ori_e);
-
-    // xQueueSend(g_lora_unit_handle, buffer, pdMS_TO_TICKS(100)); 
-
 #if true 
     printf("/*x,%.4f,xd,%.4f,y,%.4f,yd,%.4f,theta,%.4f,thetad,%.4f,dist_error,%.4f,theta_err,%.4f,ori_error,%.4f*/\n", c_pose->x, g_current_point.x, c_pose->y, g_current_point.y, c_pose->theta, g_current_point.theta, dist_error, theta_error, ori_e);
 #endif
 
-    if (dist_error >= DISTANCE_TH)
+    if (fabs(dist_error) >= DISTANCE_TH)
     {
         g_diff_drive_state = DD_STATE_NAVIGATING;
-        // ESP_ERROR_CHECK(diff_drive_position_control(theta_error));
-        // g_is_oriented = true;
-        ESP_ERROR_CHECK(diff_drive_position_control(theta_error));
-        // if (theta_error > ORIENTATION_TH && !g_is_oriented)
-        // {
-        //     ESP_ERROR_CHECK(diff_drive_orientation_control(theta_error));
-        // }
-        // else
-        // {
-        //     g_is_oriented = true;
-        //     ESP_ERROR_CHECK(diff_drive_position_control(theta_error));
-        // }
-    // }
-    // else if (fabs(ori_e) > ORIENTATION_TH)
-    // {
-    //     g_diff_drive_state = DD_STATE_ORIENTING;
-    //     ESP_ERROR_CHECK(diff_drive_orientation_control(ori_e));
-    //     // ESP_ERROR_CHECK(pid_reset_ctrl_block(diff_drive_handle->position_pid_ctrl));
+
+        if(g_current_point.x == 0.0f)
+            ESP_ERROR_CHECK(diff_drive_position_control(theta_error, false));
+        else
+            ESP_ERROR_CHECK(diff_drive_position_control(theta_error, true));
     }
     else
     {
@@ -216,8 +197,13 @@ esp_err_t diff_drive_point_follower(kalman_info_t *c_pose)
             .motor_right_speed = NULL,
         }));
 
+        float speed = 0.0f;
+        ESP_ERROR_CHECK(diff_drive_send2traction((tract_ctrl_cmd_t){
+            .cmd = TRACT_CTRL_CMD_SET_SPEED,
+            .motor_left_speed = &speed,
+            .motor_right_speed = &speed,
+        }));
         diff_drive_update_state(DD_STATE_POINT_REACHED);
-        ESP_ERROR_CHECK(pid_reset_ctrl_block(diff_drive_handle->orientation_pid_ctrl));
         ESP_ERROR_CHECK(pid_reset_ctrl_block(diff_drive_handle->position_pid_ctrl));
     }
 

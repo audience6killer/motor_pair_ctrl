@@ -178,6 +178,21 @@ esp_err_t data_center_parse_data(char *data, data_center_msg_t *msg)
         msg->code = SM_CMD_RESET_CUTTER;
         ESP_LOGI(TAG, "Command received: RESTART CUTTER");
     }
+    else if (strcmp(code, "SSD") == 0) // SM_CMD_STOP_DISPENSER 
+    {
+        msg->code = SM_CMD_STOP_DISPENSER;
+        ESP_LOGI(TAG, "Command received: STOP DISPENSER");
+    }
+    else if (strcmp(code, "GPS") == 0) // SM_CMD_GET_GPS_POS 
+    {
+        msg->code = SM_CMD_GET_GPS_POS;
+        ESP_LOGI(TAG, "Command received: GET GPS POS");
+    }
+    else if (strcmp(code, "ORI") == 0) // SM_CMD_RETURN_TO_ORIGIN 
+    {
+        msg->code = SM_CMD_RETURN_TO_ORIGIN;
+        ESP_LOGI(TAG, "Command received: RETURN TO ORIGIN");
+    }
     else
     {
         msg->code = SM_CMD_EMPTY;
